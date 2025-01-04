@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Booking Confirmation</title>
+    <style>
+        .confirmation-container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .booking-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+        .booking-table th, .booking-table td {
+            border: 1px solid #ddd;
+            padding: 12px;
+            text-align: left;
+        }
+        .booking-table th {
+            background-color: #f5f5f5;
+        }
+        .payment-button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 14px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        .payment-button:hover {
+            background-color: #45a049;
+        }
+    </style>
+</head>
+<body>
+    <div class="confirmation-container">
+        <h1>Booking Confirmation</h1>
+        <h2>{{ location.name }}</h2>
+        
+        <h3>Your bookings have been confirmed for the following dates:</h3>
+        
+        <table class="booking-table">
+            <thead>
+                <tr>
+                    <th>Booking ID</th>
+                    <th>Date</th>
+                    <th>Time</th>
+                    <th>Location</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for booking in bookings %}
+                <tr>
+                    <td>#{{ booking.id }}</td>
+                    <td>{{ booking.session_date.strftime('%d %B %Y') }}</td>
+                    <td>{{ booking.start_time.strftime('%H:%M') }} - {{ booking.end_time.strftime('%H:%M') }}</td>
+                    <td>{{ location.name }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <div style="text-align: center; margin-top: 30px;">
+            <button class="payment-button" onclick="proceedToPayment({{ bookings[0].id }})">
+                Proceed to Payment
+            </button>
+        </div>
+    </div>
+
+    <script>
+        function proceedToPayment(bookingId) {
+            // Replace this with your actual payment processing logic
+            alert('Redirecting to payment gateway...');
+            // window.location.href = '/payment/' + bookingId;
+        }
+    </script>
+</body>
+</html> 

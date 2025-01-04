@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Sport Booking</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <style>
+        .time-slot {
+            cursor: pointer;
+            padding: 10px;
+            margin: 5px;
+            border: 1px solid #ddd;
+        }
+        .time-slot:hover {
+            background-color: #f0f0f0;
+        }
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <h1>Sport Booking</h1>
+    
+    <!-- Step 1: Location and Date Selection -->
+    <div id="step1">
+        <form id="bookingForm">
+            <select name="location_id" id="location_id" required>
+                <option value="">Select Location</option>
+                {% for location in locations %}
+                <option value="{{ location.id }}">{{ location.name }}</option>
+                {% endfor %}
+            </select>
+            <input type="date" id="date" name="date" required>
+            <button type="button" onclick="showAvailableSlots()">Check Availability</button>
+        </form>
+    </div>
+
+    <!-- Step 2: Time Slots -->
+    <div id="time-slots" class="hidden"></div>
+
+    <!-- Step 3: Consecutive Dates -->
+    <div id="booking-details" class="hidden"></div>
+
+    <script>
+        function showAvailableSlots() {
+            $('#time-slots').removeClass('hidden');
+            $('#booking-details').addClass('hidden');
+            
+            $.post('/get_available_slots', {
+                location_id: $('#location_id').val(),
+                date: $('#date').val()
+            }, function(response) {
+                let slotsHtml = '<h2>Available Time Slots</h2>';
+                response.available_slots.forEach(slot => {
+                    slotsHtml += `
+                        <div class="time-slot" onclick="selectTimeSlot('${slot.start_time}', '${slot.end_time}')">
+                            ${slot.start_time} - ${slot.end_time}
+                            (${slot.available}/${slot.total_quota} available)
+                        </div>
+                    `;
+                });
+                $('#time-slots').html(slotsHtml);
+            });
+        }
+
+        function selectTimeSlot(startTime, endTime) {
+            $('#booking-details').removeClass('hidden');
+            
+            $.post('/get_consecutive_dates', {
+                location_id: $('#location_id').val(),
+                date: $('#date').val(),
+                start_time: startTime,
+                end_time: endTime
+            }, function(response) {
+                let datesHtml = `
+                    <h2>${response.location_name}</h2>
+                    <table border="1">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Time</th>
+                                <th>Availability</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                `;
+                
+                response.consecutive_dates.forEach(date => {
+                    datesHtml += `
+                        <tr>
+                            <td>${date.formatted_date}</td>
+                            <td>${date.start_time}-${date.end_time}</td>
+                            <td>${date.available_quota}/${date.total_quota} available</td>
+                        </tr>
+                    `;
+                });
+                
+                datesHtml += `
+                        </tbody>
+                    </table>
+                    <div style="margin-top: 20px;">
+                        <button onclick="confirmBooking('${response.consecutive_dates[0].date}', '${startTime}', '${endTime}')">
+                            Confirm Booking
+                        </button>
+                        <button onclick="goBack()">Back</button>
+                    </div>
+                `;
+                
+                $('#booking-details').html(datesHtml);
+            });
+        }
+
+        function confirmBooking(date, startTime, endTime) {
+            $.post('/book_session', {
+                location_id: $('#location_id').val(),
+                date: date,
+                start_time: startTime,
+                end_time: endTime
+            }, function(response) {
+                if (response.success) {
+                    window.location.href = '/booking_confirmation/' + response.booking_id;
+                } else {
+                    alert('Booking failed: ' + response.message);
+                }
+            });
+        }
+
+        function goBack() {
+            $('#booking-details').addClass('hidden');
+            $('#time-slots').removeClass('hidden');
+        }
+    </script>
+</body>
+</html> 

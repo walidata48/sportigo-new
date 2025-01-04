@@ -1,0 +1,10 @@
+<!-- Add this in your navigation bar -->
+{% if 'user_id' in session %}
+    <li class="nav-item">
+        <a class="nav-link" href="{{ url_for('logout') }}">Logout</a>
+    </li>
+{% else %}
+    <li class="nav-item">
+        <a class="nav-link" href="{{ url_for('login') }}">Login</a>
+    </li>
+{% endif %} 
