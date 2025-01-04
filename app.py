@@ -34,6 +34,7 @@ class Booking(db.Model):
     start_time = db.Column(db.Time, nullable=False)
     end_time = db.Column(db.Time, nullable=False)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    payment_status = db.Column(db.String(20), default='pending')
 
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -394,6 +395,58 @@ def process_booking():
         db.session.rollback()
         flash('An error occurred. Please try again.')
         return redirect(url_for('booking_schedule'))
+
+@app.route('/update_payment_status', methods=['POST'])
+@login_required
+def update_payment_status():
+    try:
+        booking_id = request.form.get('booking_id')
+        first_booking = Booking.query.get_or_404(booking_id)
+        
+        # Update payment status for all 4 bookings
+        bookings = Booking.query.filter_by(
+            location_id=first_booking.location_id,
+            start_time=first_booking.start_time,
+            end_time=first_booking.end_time,
+            user_id=session['user_id']
+        ).filter(
+            Booking.session_date >= first_booking.session_date
+        ).order_by(Booking.session_date).limit(4).all()
+        
+        for booking in bookings:
+            booking.payment_status = 'paid'
+        
+        db.session.commit()
+        return jsonify({'success': True, 'message': 'Payment status updated successfully'})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)})
+
+@app.route('/cancel_bookings', methods=['POST'])
+@login_required
+def cancel_bookings():
+    try:
+        booking_id = request.form.get('booking_id')
+        first_booking = Booking.query.get_or_404(booking_id)
+        
+        # Delete all 4 bookings
+        bookings = Booking.query.filter_by(
+            location_id=first_booking.location_id,
+            start_time=first_booking.start_time,
+            end_time=first_booking.end_time,
+            user_id=session['user_id']
+        ).filter(
+            Booking.session_date >= first_booking.session_date
+        ).order_by(Booking.session_date).limit(4).all()
+        
+        for booking in bookings:
+            db.session.delete(booking)
+        
+        db.session.commit()
+        return jsonify({'success': True, 'message': 'Bookings cancelled successfully'})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)})
 
 if __name__ == '__main__':
     app.run(debug=True)

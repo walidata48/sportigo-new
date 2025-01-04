@@ -30,7 +30,15 @@
                                 <td>{{ booking.session_date.strftime('%d %B %Y') }}</td>
                                 <td>{{ booking.start_time.strftime('%H:%M') }} - {{ booking.end_time.strftime('%H:%M') }}</td>
                                 <td>{{ location.name }}</td>
-                                <td><span class="badge bg-warning">Menunggu Pembayaran</span></td>
+                                <td>
+                                    <span class="badge {% if booking.payment_status == 'paid' %}bg-success{% else %}bg-warning{% endif %}">
+                                        {% if booking.payment_status == 'paid' %}
+                                            Sudah Bayar
+                                        {% else %}
+                                            Menunggu Pembayaran
+                                        {% endif %}
+                                    </span>
+                                </td>
                             </tr>
                             {% endfor %}
                         </tbody>
@@ -59,8 +67,13 @@
                 </div>
 
                 <div class="text-center mt-4">
-                    <button class="btn btn-primary btn-lg" onclick="proceedToPayment('{{ bookings[0].id }}')">
+                    {% if bookings[0].payment_status != 'paid' %}
+                    <button class="btn btn-primary btn-lg me-2" onclick="proceedToPayment('{{ bookings[0].id }}')">
                         <i class="fas fa-credit-card me-2"></i>Lanjutkan ke Pembayaran
+                    </button>
+                    {% endif %}
+                    <button class="btn btn-danger btn-lg" onclick="cancelBookings('{{ bookings[0].id }}')">
+                        <i class="fas fa-times me-2"></i>Batalkan Semua Jadwal
                     </button>
                 </div>
             </div>
@@ -69,10 +82,46 @@
 </section>
 
 <script>
-    function proceedToPayment(bookingId) {
-        // Replace this with your actual payment processing logic
-        alert('Redirecting to payment gateway...');
-        // window.location.href = '/payment/' + bookingId;
+function proceedToPayment(bookingId) {
+    if (confirm('Apakah Anda yakin ingin melanjutkan pembayaran?')) {
+        fetch('/update_payment_status', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: 'booking_id=' + bookingId
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('Pembayaran berhasil!');
+                location.reload();
+            } else {
+                alert('Terjadi kesalahan: ' + data.message);
+            }
+        });
     }
+}
+
+function cancelBookings(bookingId) {
+    if (confirm('Apakah Anda yakin ingin membatalkan semua jadwal?')) {
+        fetch('/cancel_bookings', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: 'booking_id=' + bookingId
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('Jadwal berhasil dibatalkan');
+                window.location.href = '/dashboard';
+            } else {
+                alert('Terjadi kesalahan: ' + data.message);
+            }
+        });
+    }
+}
 </script>
 {% endblock %} 
