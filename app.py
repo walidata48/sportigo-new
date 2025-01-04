@@ -51,10 +51,14 @@ def login_required(f):
     return decorated_function
 
 @app.route('/')
-@login_required
 def index():
+    return render_template('index.html')
+
+@app.route('/dashboard')
+@login_required
+def dashboard():
     locations = Location.query.all()
-    return render_template('index.html', locations=locations)
+    return render_template('dashboard.html', locations=locations)
 
 @app.route('/get_available_slots', methods=['POST'])
 @login_required
