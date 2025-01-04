@@ -122,3 +122,254 @@
 .program-features li:last-child {
     border-bottom: none;
 } 
+
+/* Dashboard Section */
+.dashboard-section {
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    min-height: 100vh;
+}
+
+/* Membership Cards */
+.membership-card {
+    background: white;
+    border-radius: 15px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    overflow: hidden;
+    position: relative;
+    transition: transform 0.3s ease;
+}
+
+.membership-card.active:hover {
+    transform: translateY(-10px);
+}
+
+.membership-card.disabled {
+    opacity: 0.8;
+}
+
+.card-header {
+    background: #0056b3;
+    color: white;
+    padding: 30px 20px;
+    text-align: center;
+}
+
+.card-header h3 {
+    margin: 0;
+    font-size: 1.5rem;
+}
+
+.price {
+    margin-top: 15px;
+}
+
+.amount {
+    font-size: 2rem;
+    font-weight: bold;
+}
+
+.period {
+    font-size: 1rem;
+}
+
+.card-body {
+    padding: 30px 20px;
+}
+
+.benefits-list {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 20px 0;
+}
+
+.benefits-list li {
+    padding: 10px 0;
+    border-bottom: 1px solid #e9ecef;
+}
+
+.benefits-list li:last-child {
+    border-bottom: none;
+}
+
+.benefits-list i {
+    margin-right: 10px;
+    color: #0056b3;
+}
+
+.benefits-list i.fa-times {
+    color: #dc3545;
+}
+
+.ribbon {
+    position: absolute;
+    top: 20px;
+    right: -35px;
+    transform: rotate(45deg);
+    background: #dc3545;
+    color: white;
+    padding: 5px 40px;
+    font-size: 0.8rem;
+    font-weight: bold;
+}
+
+/* Buttons */
+.btn-secondary {
+    background-color: #6c757d;
+    border-color: #6c757d;
+}
+
+.btn-secondary:disabled {
+    background-color: #6c757d;
+    border-color: #6c757d;
+    cursor: not-allowed;
+} 
+
+/* Booking Section */
+.booking-section {
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    min-height: 100vh;
+}
+
+.booking-form {
+    background: white;
+    padding: 40px;
+    border-radius: 15px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+/* Time Slots */
+.time-slots {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 15px;
+    margin-top: 10px;
+}
+
+.time-slot-option {
+    position: relative;
+}
+
+.time-slot-option input[type="radio"] {
+    display: none;
+}
+
+.time-slot-option label {
+    display: block;
+    padding: 15px;
+    background: #f8f9fa;
+    border: 2px solid #dee2e6;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.time-slot-option label.disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.time-slot-option input[type="radio"]:checked + label {
+    background: #0056b3;
+    color: white;
+    border-color: #0056b3;
+}
+
+.availability {
+    display: block;
+    font-size: 0.8rem;
+    margin-top: 5px;
+    color: #6c757d;
+}
+
+.time-slot-option input[type="radio"]:checked + label .availability {
+    color: rgba(255, 255, 255, 0.8);
+} 
+
+/* Confirmation Section */
+.confirmation-section {
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    min-height: 100vh;
+}
+
+.confirmation-card {
+    background: white;
+    border-radius: 15px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    padding: 40px;
+    margin: 20px auto;
+    max-width: 900px;
+}
+
+.confirmation-icon {
+    font-size: 4rem;
+    color: #28a745;
+}
+
+.booking-table {
+    margin-top: 20px;
+}
+
+.booking-table th {
+    background-color: #f8f9fa;
+}
+
+.payment-summary .card {
+    background-color: #f8f9fa;
+    border: none;
+}
+
+.badge {
+    padding: 8px 12px;
+    font-weight: 500;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .confirmation-card {
+        padding: 20px;
+    }
+    
+    .table-responsive {
+        margin: 0 -15px;
+    }
+} 
+
+/* Add to your existing CSS */
+.consecutive-dates {
+    background: #f8f9fa;
+    padding: 20px;
+    border-radius: 10px;
+    margin-top: 20px;
+}
+
+.consecutive-date-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px;
+    border-bottom: 1px solid #dee2e6;
+}
+
+.consecutive-date-item:last-child {
+    border-bottom: none;
+}
+
+.consecutive-date-item .date {
+    font-weight: 500;
+}
+
+.consecutive-date-item .time {
+    color: #6c757d;
+}
+
+.consecutive-date-item .quota {
+    font-size: 0.9rem;
+}
+
+.text-success {
+    color: #28a745;
+}
+
+.text-danger {
+    color: #dc3545;
+} 

@@ -1,81 +1,78 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Booking Confirmation</title>
-    <style>
-        .confirmation-container {
-            max-width: 800px;
-            margin: 0 auto;
-            padding: 20px;
-        }
-        .booking-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin: 20px 0;
-        }
-        .booking-table th, .booking-table td {
-            border: 1px solid #ddd;
-            padding: 12px;
-            text-align: left;
-        }
-        .booking-table th {
-            background-color: #f5f5f5;
-        }
-        .payment-button {
-            background-color: #4CAF50;
-            color: white;
-            padding: 14px 20px;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 16px;
-        }
-        .payment-button:hover {
-            background-color: #45a049;
-        }
-    </style>
-</head>
-<body>
-    <div class="confirmation-container">
-        <h1>Booking Confirmation</h1>
-        <h2>{{ location.name }}</h2>
-        
-        <h3>Your bookings have been confirmed for the following dates:</h3>
-        
-        <table class="booking-table">
-            <thead>
-                <tr>
-                    <th>Booking ID</th>
-                    <th>Date</th>
-                    <th>Time</th>
-                    <th>Location</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for booking in bookings %}
-                <tr>
-                    <td>#{{ booking.id }}</td>
-                    <td>{{ booking.session_date.strftime('%d %B %Y') }}</td>
-                    <td>{{ booking.start_time.strftime('%H:%M') }} - {{ booking.end_time.strftime('%H:%M') }}</td>
-                    <td>{{ location.name }}</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+{% extends "base.html" %}
 
-        <div style="text-align: center; margin-top: 30px;">
-            <button class="payment-button" onclick="proceedToPayment({{ bookings[0].id }})">
-                Proceed to Payment
-            </button>
+{% block content %}
+<section class="confirmation-section py-5">
+    <div class="container">
+        <div class="confirmation-card">
+            <div class="text-center mb-4">
+                <i class="fas fa-check-circle confirmation-icon"></i>
+                <h2 class="mt-3">Booking Berhasil!</h2>
+                <p class="lead">{{ location.name }}</p>
+            </div>
+
+            <div class="booking-details">
+                <h4 class="mb-3">Detail Jadwal Latihan Anda:</h4>
+                <div class="table-responsive">
+                    <table class="table booking-table">
+                        <thead>
+                            <tr>
+                                <th>Booking ID</th>
+                                <th>Tanggal</th>
+                                <th>Waktu</th>
+                                <th>Lokasi</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for booking in bookings %}
+                            <tr>
+                                <td>#{{ booking.id }}</td>
+                                <td>{{ booking.session_date.strftime('%d %B %Y') }}</td>
+                                <td>{{ booking.start_time.strftime('%H:%M') }} - {{ booking.end_time.strftime('%H:%M') }}</td>
+                                <td>{{ location.name }}</td>
+                                <td><span class="badge bg-warning">Menunggu Pembayaran</span></td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="payment-summary mt-4">
+                    <h4 class="mb-3">Ringkasan Pembayaran</h4>
+                    <div class="card">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between mb-3">
+                                <span>Biaya per Sesi</span>
+                                <span>Rp 200.000</span>
+                            </div>
+                            <div class="d-flex justify-content-between mb-3">
+                                <span>Jumlah Sesi (4 minggu)</span>
+                                <span>x 4</span>
+                            </div>
+                            <hr>
+                            <div class="d-flex justify-content-between fw-bold">
+                                <span>Total Pembayaran</span>
+                                <span>Rp 800.000</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="text-center mt-4">
+                    <button class="btn btn-primary btn-lg" onclick="proceedToPayment('{{ bookings[0].id }}')">
+                        <i class="fas fa-credit-card me-2"></i>Lanjutkan ke Pembayaran
+                    </button>
+                </div>
+            </div>
         </div>
     </div>
+</section>
 
-    <script>
-        function proceedToPayment(bookingId) {
-            // Replace this with your actual payment processing logic
-            alert('Redirecting to payment gateway...');
-            // window.location.href = '/payment/' + bookingId;
-        }
-    </script>
-</body>
-</html> 
+<script>
+    function proceedToPayment(bookingId) {
+        // Replace this with your actual payment processing logic
+        alert('Redirecting to payment gateway...');
+        // window.location.href = '/payment/' + bookingId;
+    }
+</script>
+{% endblock %} 

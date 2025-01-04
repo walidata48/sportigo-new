@@ -104,28 +104,38 @@ def get_consecutive_dates():
     location = Location.query.get(location_id)
     consecutive_dates = []
     
+    # Convert time strings to time objects once
+    start_time_obj = datetime.strptime(start_time, '%H:%M').time()
+    end_time_obj = datetime.strptime(end_time, '%H:%M').time()
+    
     # Get current date and next 3 weeks
     current_date = selected_date
     for i in range(4):
+        # Get day name for current date
+        day_name = calendar.day_name[current_date.weekday()]
+        
+        # Get quota for this day
+        quota_obj = Quota.query.filter_by(
+            location_id=location_id,
+            day_name=day_name,
+            start_time=start_time_obj,
+            end_time=end_time_obj
+        ).first()
+
+        if not quota_obj:
+            return jsonify({
+                'error': 'No quota available for selected time slot'
+            }), 400
+
         # Count existing bookings for this specific date and time slot
         bookings_count = Booking.query.filter_by(
             location_id=location_id,
             session_date=current_date,
-            start_time=datetime.strptime(start_time, '%H:%M').time(),
-            end_time=datetime.strptime(end_time, '%H:%M').time()
+            start_time=start_time_obj,
+            end_time=end_time_obj
         ).count()
 
-        # Get quota for this day
-        day_name = calendar.day_name[current_date.weekday()]
-        quota_obj = Quota.query.filter_by(
-            location_id=location_id,
-            day_name=day_name,
-            start_time=datetime.strptime(start_time, '%H:%M').time(),
-            end_time=datetime.strptime(end_time, '%H:%M').time()
-        ).first()
-
-        total_quota = quota_obj.quota if quota_obj else 0
-        available_quota = total_quota - bookings_count
+        available_quota = quota_obj.quota - bookings_count
 
         date_info = {
             'date': current_date.strftime('%Y-%m-%d'),
@@ -133,7 +143,8 @@ def get_consecutive_dates():
             'start_time': start_time,
             'end_time': end_time,
             'available_quota': available_quota,
-            'total_quota': total_quota
+            'total_quota': quota_obj.quota,
+            'is_available': available_quota > 0
         }
         consecutive_dates.append(date_info)
         current_date += timedelta(days=7)
@@ -180,24 +191,66 @@ def booking_confirmation(booking_id):
     
     location = Location.query.get(first_booking.location_id)
     return render_template('booking_confirmation.html', 
-                         bookings=bookings,  # Pass the list of bookings
+                         bookings=bookings,
                          location=location)
 
 @app.route('/book_session', methods=['POST'])
 @login_required
 def book_session():
     try:
+        # Get form data
         location_id = request.form.get('location_id')
-        first_session_date = datetime.strptime(request.form.get('date'), '%Y-%m-%d')
-        start_time = datetime.strptime(request.form.get('start_time'), '%H:%M').time()
-        end_time = datetime.strptime(request.form.get('end_time'), '%H:%M').time()
+        date_str = request.form.get('date')
+        start_time_str = request.form.get('start_time')
+        end_time_str = request.form.get('end_time')
+
+        # Validate input
+        if not all([location_id, date_str, start_time_str, end_time_str]):
+            return jsonify({
+                'success': False,
+                'message': 'Semua field harus diisi'
+            })
+
+        # Parse dates and times
+        first_session_date = datetime.strptime(date_str, '%Y-%m-%d')
+        start_time = datetime.strptime(start_time_str, '%H:%M').time()
+        end_time = datetime.strptime(end_time_str, '%H:%M').time()
 
         # Create bookings for 4 consecutive weeks
         bookings = []
         current_date = first_session_date
         
         for i in range(4):
-            # Create new booking for each date
+            # Check quota availability for each date
+            day_name = calendar.day_name[current_date.weekday()]
+            quota = Quota.query.filter_by(
+                location_id=location_id,
+                day_name=day_name,
+                start_time=start_time,
+                end_time=end_time
+            ).first()
+
+            if not quota:
+                return jsonify({
+                    'success': False,
+                    'message': f'Tidak ada kuota tersedia untuk tanggal {current_date.strftime("%d %B %Y")}'
+                })
+
+            # Count existing bookings
+            existing_bookings = Booking.query.filter_by(
+                location_id=location_id,
+                session_date=current_date,
+                start_time=start_time,
+                end_time=end_time
+            ).count()
+
+            if existing_bookings >= quota.quota:
+                return jsonify({
+                    'success': False,
+                    'message': f'Kuota penuh untuk tanggal {current_date.strftime("%d %B %Y")}'
+                })
+
+            # Create booking
             booking = Booking(
                 location_id=location_id,
                 session_date=current_date,
@@ -214,16 +267,18 @@ def book_session():
         
         db.session.commit()
 
-        # Return the ID of the first booking for confirmation page
         return jsonify({
             'success': True, 
-            'message': 'Bookings successful',
+            'message': 'Booking berhasil',
             'booking_id': bookings[0].id
         })
 
     except Exception as e:
         db.session.rollback()
-        return jsonify({'success': False, 'message': str(e)})
+        return jsonify({
+            'success': False,
+            'message': f'Terjadi kesalahan: {str(e)}'
+        })
 
 @app.route('/signup', methods=['GET', 'POST'])
 def signup():
@@ -301,6 +356,44 @@ def logout():
     session.pop('user_id', None)
     flash('You have been logged out.')
     return redirect(url_for('login'))
+
+@app.route('/booking_schedule')
+@login_required
+def booking_schedule():
+    locations = Location.query.all()
+    return render_template('booking_schedule.html', locations=locations)
+
+@app.route('/process_booking', methods=['POST'])
+@login_required
+def process_booking():
+    location_id = request.form.get('location')
+    date = request.form.get('date')
+    time_slot = request.form.get('timeSlot')
+    
+    if not all([location_id, date, time_slot]):
+        flash('Please fill in all required fields')
+        return redirect(url_for('booking_schedule'))
+    
+    start_time, end_time = time_slot.split('-')
+    
+    # Create booking
+    booking = Booking(
+        location_id=location_id,
+        session_date=datetime.strptime(date, '%Y-%m-%d'),
+        start_time=datetime.strptime(start_time, '%H:%M').time(),
+        end_time=datetime.strptime(end_time, '%H:%M').time(),
+        user_id=session['user_id']
+    )
+    
+    try:
+        db.session.add(booking)
+        db.session.commit()
+        flash('Booking successful!')
+        return redirect(url_for('booking_confirmation', booking_id=booking.id))
+    except:
+        db.session.rollback()
+        flash('An error occurred. Please try again.')
+        return redirect(url_for('booking_schedule'))
 
 if __name__ == '__main__':
     app.run(debug=True)
