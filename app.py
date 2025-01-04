@@ -29,6 +29,7 @@ class Quota(db.Model):
 
 class Booking(db.Model):
     id = db.Column(db.Integer, primary_key=True)
+    group_id = db.Column(db.String(50), nullable=True)  # Add this line
     location_id = db.Column(db.Integer, db.ForeignKey('location.id'), nullable=False)
     session_date = db.Column(db.Date, nullable=False)
     start_time = db.Column(db.Time, nullable=False)
@@ -212,6 +213,9 @@ def book_session():
                 'message': 'Semua field harus diisi'
             })
 
+        # Generate a unique group_id (timestamp + user_id)
+        group_id = f"{int(datetime.now().timestamp())}_{session['user_id']}"
+
         # Parse dates and times
         first_session_date = datetime.strptime(date_str, '%Y-%m-%d')
         start_time = datetime.strptime(start_time_str, '%H:%M').time()
@@ -251,8 +255,9 @@ def book_session():
                     'message': f'Kuota penuh untuk tanggal {current_date.strftime("%d %B %Y")}'
                 })
 
-            # Create booking
+            # Create booking with group_id
             booking = Booking(
+                group_id=group_id,  # Add the group_id
                 location_id=location_id,
                 session_date=current_date,
                 start_time=start_time,
@@ -403,15 +408,11 @@ def update_payment_status():
         booking_id = request.form.get('booking_id')
         first_booking = Booking.query.get_or_404(booking_id)
         
-        # Update payment status for all 4 bookings
+        # Update payment status for all bookings with the same group_id
         bookings = Booking.query.filter_by(
-            location_id=first_booking.location_id,
-            start_time=first_booking.start_time,
-            end_time=first_booking.end_time,
+            group_id=first_booking.group_id,
             user_id=session['user_id']
-        ).filter(
-            Booking.session_date >= first_booking.session_date
-        ).order_by(Booking.session_date).limit(4).all()
+        ).all()
         
         for booking in bookings:
             booking.payment_status = 'paid'
@@ -429,15 +430,11 @@ def cancel_bookings():
         booking_id = request.form.get('booking_id')
         first_booking = Booking.query.get_or_404(booking_id)
         
-        # Delete all 4 bookings
+        # Delete all bookings with the same group_id
         bookings = Booking.query.filter_by(
-            location_id=first_booking.location_id,
-            start_time=first_booking.start_time,
-            end_time=first_booking.end_time,
+            group_id=first_booking.group_id,
             user_id=session['user_id']
-        ).filter(
-            Booking.session_date >= first_booking.session_date
-        ).order_by(Booking.session_date).limit(4).all()
+        ).all()
         
         for booking in bookings:
             db.session.delete(booking)
