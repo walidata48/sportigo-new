@@ -31,13 +31,14 @@ class Quota(db.Model):
 
 class Booking(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    group_id = db.Column(db.String(50), nullable=True)  # Add this line
+    group_id = db.Column(db.String(50), nullable=True)
     location_id = db.Column(db.Integer, db.ForeignKey('location.id'), nullable=False)
     session_date = db.Column(db.Date, nullable=False)
     start_time = db.Column(db.Time, nullable=False)
     end_time = db.Column(db.Time, nullable=False)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     payment_status = db.Column(db.String(20), default='pending')
+    location = db.relationship('Location', backref='bookings', lazy=True)
 
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -63,7 +64,7 @@ def login_required(f):
 
 @app.route('/')
 def index():
-    return render_template('index.html')
+    return render_template('dashboard.html')
 
 @app.route('/dashboard')
 @login_required
@@ -489,5 +490,34 @@ def apply_coupon():
         'message': f'Kupon berhasil diterapkan! Diskon {coupon.discount_percentage}%'
     })
 
+@app.route('/my_schedules')
+@login_required
+def my_schedules():
+    # Get all bookings for the current user, ordered by date
+    bookings = Booking.query.filter_by(
+        user_id=session['user_id']
+    ).order_by(
+        Booking.session_date.desc(),
+        Booking.start_time
+    ).all()
+    
+    # Group bookings by group_id for package bookings
+    grouped_bookings = {}
+    single_bookings = []
+    
+    for booking in bookings:
+        if booking.group_id:
+            if booking.group_id not in grouped_bookings:
+                grouped_bookings[booking.group_id] = []
+            grouped_bookings[booking.group_id].append(booking)
+        else:
+            single_bookings.append(booking)
+    
+    return render_template(
+        'my_schedules.html',
+        grouped_bookings=grouped_bookings,
+        single_bookings=single_bookings
+    )
+
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug=True, host='0.0.0.0', port=5001)
