@@ -17,6 +17,8 @@ migrate = Migrate(app, db)
 class Location(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
+    monthly_price = db.Column(db.Integer, nullable=False)  # Price for 4 sessions package
+    daily_price = db.Column(db.Integer, nullable=False)    # Price for single session
     quotas = db.relationship('Quota', backref='location', lazy=True)
 
 class Quota(db.Model):
@@ -43,6 +45,13 @@ class User(db.Model):
     email = db.Column(db.String(120), unique=True, nullable=False)
     password_hash = db.Column(db.String(255), nullable=False)
     bookings = db.relationship('Booking', backref='user', lazy=True)
+
+class Coupon(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    code = db.Column(db.String(20), unique=True, nullable=False)
+    discount_percentage = db.Column(db.Integer, nullable=False)  # Store as whole number (e.g., 10 for 10%)
+    valid_until = db.Column(db.Date, nullable=True)
+    is_active = db.Column(db.Boolean, default=True)
 
 def login_required(f):
     @wraps(f)
@@ -406,7 +415,16 @@ def process_booking():
 def update_payment_status():
     try:
         booking_id = request.form.get('booking_id')
+        coupon_code = request.form.get('coupon_code')
+        
         first_booking = Booking.query.get_or_404(booking_id)
+        
+        # Apply coupon if provided
+        discount_percentage = 0
+        if coupon_code:
+            coupon = Coupon.query.filter_by(code=coupon_code, is_active=True).first()
+            if coupon and (not coupon.valid_until or coupon.valid_until >= datetime.now().date()):
+                discount_percentage = coupon.discount_percentage
         
         # Update payment status for all bookings with the same group_id
         bookings = Booking.query.filter_by(
@@ -416,6 +434,7 @@ def update_payment_status():
         
         for booking in bookings:
             booking.payment_status = 'paid'
+            booking.applied_discount = discount_percentage  # You might want to add this field to the Booking model
         
         db.session.commit()
         return jsonify({'success': True, 'message': 'Payment status updated successfully'})
@@ -444,6 +463,31 @@ def cancel_bookings():
     except Exception as e:
         db.session.rollback()
         return jsonify({'success': False, 'message': str(e)})
+
+@app.route('/apply_coupon', methods=['POST'])
+@login_required
+def apply_coupon():
+    coupon_code = request.form.get('coupon_code')
+    
+    coupon = Coupon.query.filter_by(code=coupon_code, is_active=True).first()
+    
+    if not coupon:
+        return jsonify({
+            'success': False,
+            'message': 'Kode kupon tidak valid'
+        })
+    
+    if coupon.valid_until and coupon.valid_until < datetime.now().date():
+        return jsonify({
+            'success': False,
+            'message': 'Kode kupon sudah kadaluarsa'
+        })
+    
+    return jsonify({
+        'success': True,
+        'discount_percentage': coupon.discount_percentage,
+        'message': f'Kupon berhasil diterapkan! Diskon {coupon.discount_percentage}%'
+    })
 
 if __name__ == '__main__':
     app.run(debug=True)

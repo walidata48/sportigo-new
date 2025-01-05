@@ -16,20 +16,20 @@
                     <table class="table booking-table">
                         <thead>
                             <tr>
-                                <th>Booking ID</th>
+                                
                                 <th>Tanggal</th>
                                 <th>Waktu</th>
-                                <th>Lokasi</th>
+                                
                                 <th>Status</th>
                             </tr>
                         </thead>
                         <tbody>
                             {% for booking in bookings %}
                             <tr>
-                                <td>#{{ booking.id }}</td>
+                                
                                 <td>{{ booking.session_date.strftime('%d %B %Y') }}</td>
                                 <td>{{ booking.start_time.strftime('%H:%M') }} - {{ booking.end_time.strftime('%H:%M') }}</td>
-                                <td>{{ location.name }}</td>
+                                
                                 <td>
                                     <span class="badge {% if booking.payment_status == 'paid' %}bg-success{% else %}bg-warning{% endif %}">
                                         {% if booking.payment_status == 'paid' %}
@@ -50,17 +50,28 @@
                     <div class="card">
                         <div class="card-body">
                             <div class="d-flex justify-content-between mb-3">
-                                <span>Biaya per Sesi</span>
-                                <span>Rp 200.000</span>
+                                <span>Paket Bulanan (4 sesi)</span>
+                                <span>Rp {{ "{:,.0f}".format(location.monthly_price) }}</span>
                             </div>
-                            <div class="d-flex justify-content-between mb-3">
-                                <span>Jumlah Sesi (4 minggu)</span>
-                                <span>x 4</span>
+                            <div class="small text-muted mb-3">
+                                <i class="fas fa-info-circle"></i> Harga per sesi: Rp {{ "{:,.0f}".format(location.monthly_price / 4) }}
+                                <br>
+                                <i class="fas fa-check"></i> Hemat Rp {{ "{:,.0f}".format((location.daily_price * 4) - location.monthly_price) }} dibanding harga harian
                             </div>
+
+                            <!-- Add coupon code form -->
+                            <div class="coupon-section mb-3">
+                                <div class="input-group">
+                                    <input type="text" id="couponCode" class="form-control" placeholder="Kode Kupon">
+                                    <button class="btn btn-outline-secondary" type="button" onclick="applyCoupon()">Terapkan</button>
+                                </div>
+                                <div id="couponMessage" class="small mt-1"></div>
+                            </div>
+
                             <hr>
                             <div class="d-flex justify-content-between fw-bold">
                                 <span>Total Pembayaran</span>
-                                <span>Rp 800.000</span>
+                                <span id="totalPayment">Rp {{ "{:,.0f}".format(location.monthly_price) }}</span>
                             </div>
                         </div>
                     </div>
@@ -122,6 +133,43 @@ function cancelBookings(bookingId) {
             }
         });
     }
+}
+
+let originalPrice = {{ location.monthly_price }};
+let appliedCouponDiscount = 0;
+
+function applyCoupon() {
+    const couponCode = document.getElementById('couponCode').value;
+    
+    fetch('/apply_coupon', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: 'coupon_code=' + couponCode
+    })
+    .then(response => response.json())
+    .then(data => {
+        const messageElement = document.getElementById('couponMessage');
+        if (data.success) {
+            messageElement.className = 'small mt-1 text-success';
+            messageElement.textContent = `Kupon berhasil diterapkan! Diskon ${data.discount_percentage}%`;
+            appliedCouponDiscount = data.discount_percentage;
+            updateTotalPrice();
+        } else {
+            messageElement.className = 'small mt-1 text-danger';
+            messageElement.textContent = data.message;
+            appliedCouponDiscount = 0;
+            updateTotalPrice();
+        }
+    });
+}
+
+function updateTotalPrice() {
+    const discountAmount = (originalPrice * appliedCouponDiscount) / 100;
+    const finalPrice = originalPrice - discountAmount;
+    document.getElementById('totalPayment').textContent = 
+        'Rp ' + finalPrice.toLocaleString('id-ID');
 }
 </script>
 {% endblock %} 
