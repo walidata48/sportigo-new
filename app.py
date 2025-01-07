@@ -51,7 +51,7 @@ class User(db.Model):
 class Coupon(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     code = db.Column(db.String(20), unique=True, nullable=False)
-    discount_percentage = db.Column(db.Integer, nullable=False)  # Store as whole number (e.g., 10 for 10%)
+    discount_amount = db.Column(db.Integer, nullable=False)  # Store as fixed amount (e.g., 50000)
     valid_until = db.Column(db.Date, nullable=True)
     is_active = db.Column(db.Boolean, default=True)
 
@@ -82,6 +82,7 @@ class ASABooking(db.Model):
     package_id = db.Column(db.Integer, db.ForeignKey('asa_packages.id'), nullable=False)
     booking_date = db.Column(db.DateTime, default=datetime.utcnow)
     payment_status = db.Column(db.String(20), default='pending')
+    applied_discount = db.Column(db.Integer, default=0)  # Store actual discount amount
     
     package = db.relationship('ASAPool', backref='bookings')
     user = db.relationship('User', backref='asa_bookings')
@@ -584,16 +585,121 @@ def asa_book(package_id):
     # Create booking
     booking = ASABooking(
         user_id=session['user_id'],
+        package_id=package_id,
+        payment_status='pending'  # Initial status
+    )
+    db.session.add(booking)
+    
+    try:
+        db.session.commit()
+        # Redirect to booking confirmation page
+        return redirect(url_for('asa_booking_confirmation', booking_id=booking.id))
+    except Exception as e:
+        db.session.rollback()
+        flash('An error occurred while processing your booking. Please try again.', 'error')
+        return redirect(url_for('asa_packages'))
+
+@app.route('/asa/booking_confirmation/<int:booking_id>')
+@login_required
+def asa_booking_confirmation(booking_id):
+    booking = ASABooking.query.get_or_404(booking_id)
+    package = ASAPool.query.get(booking.package_id)
+    
+    return render_template('asa/booking_confirmation.html', 
+                         booking=booking,
+                         package=package)
+
+@app.route('/update_asa_payment_status', methods=['POST'])
+@login_required
+def update_asa_payment_status():
+    try:
+        booking_id = request.form.get('booking_id')
+        applied_discount = request.form.get('applied_discount', type=int)
+        
+        booking = ASABooking.query.get_or_404(booking_id)
+        
+        # Update payment status and applied discount
+        booking.payment_status = 'paid'
+        booking.applied_discount = applied_discount  # You'll need to add this field to ASABooking model
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Payment status updated successfully'
+        })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            'success': False,
+            'message': str(e)
+        })
+
+@app.route('/asa/payment', methods=['POST'])
+@login_required
+def asa_payment():
+    package_id = request.form.get('package_id')
+    payment_method = request.form.get('payment_method')
+    
+    package = ASAPool.query.get_or_404(package_id)
+    
+    # Create booking
+    booking = ASABooking(
+        user_id=session['user_id'],
         package_id=package_id
     )
     db.session.add(booking)
-    db.session.flush()
-
-    # Here you would add logic to create the booking sessions based on selected schedules
-    # This is just a placeholder - you'll need to implement the actual logic
-    selected_schedules = request.form.getlist('schedules')
     
-    return redirect(url_for('asa_booking_confirmation', booking_id=booking.id))
+    try:
+        db.session.commit()
+        
+        # If payment method is transfer, show transfer instructions
+        if payment_method == 'transfer':
+            return render_template('asa/payment_transfer.html', 
+                                booking=booking,
+                                package=package)
+        # If payment method is QRIS, show QR code
+        else:
+            return render_template('asa/payment_qris.html',
+                                booking=booking,
+                                package=package)
+                                
+    except Exception as e:
+        db.session.rollback()
+        flash('An error occurred while processing your booking. Please try again.', 'error')
+        return redirect(url_for('asa_packages'))
+
+@app.route('/apply_asa_coupon', methods=['POST'])
+@login_required
+def apply_asa_coupon():
+    coupon_code = request.form.get('coupon_code')
+    package_price = request.form.get('package_price', type=int)
+    
+    coupon = Coupon.query.filter_by(code=coupon_code, is_active=True).first()
+    
+    if not coupon:
+        return jsonify({
+            'success': False,
+            'message': 'Kode kupon tidak valid'
+        })
+    
+    if coupon.valid_until and coupon.valid_until < datetime.now().date():
+        return jsonify({
+            'success': False,
+            'message': 'Kupon sudah kadaluarsa'
+        })
+
+    if coupon.discount_amount > package_price:
+        return jsonify({
+            'success': False,
+            'message': 'Nilai kupon melebihi harga paket'
+        })
+    
+    return jsonify({
+        'success': True,
+        'discount_amount': coupon.discount_amount,
+        'message': f'Kupon berhasil! Potongan Rp {coupon.discount_amount:,}'
+    })
 
 # Function to initialize ASA packages and schedules
 def initialize_asa_data():

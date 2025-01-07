@@ -1,0 +1,162 @@
+.pricing-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 30px;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.pricing-card {
+    background: white;
+    border-radius: 20px;
+    padding: 40px;
+    position: relative;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.05);
+}
+
+.pricing-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+}
+
+.pricing-card.popular {
+    border: 2px solid #007bff;
+    background: linear-gradient(to bottom, #ffffff, #f8f9ff);
+}
+
+.popular-badge {
+    position: absolute;
+    top: -12px;
+    right: 20px;
+    background: #007bff;
+    color: white;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 0.875rem;
+    font-weight: 500;
+}
+
+.pricing-header {
+    text-align: center;
+    margin-bottom: 30px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid #eee;
+}
+
+.plan-name {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: #2c3e50;
+    margin-bottom: 15px;
+}
+
+.price {
+    display: flex;
+    align-items: baseline;
+    justify-content: center;
+    gap: 4px;
+}
+
+.price .currency {
+    font-size: 1.5rem;
+    font-weight: 500;
+    color: #2c3e50;
+}
+
+.price .amount {
+    font-size: 3.5rem;
+    font-weight: 700;
+    color: #2c3e50;
+    line-height: 1;
+}
+
+.price .period {
+    font-size: 1rem;
+    color: #6c757d;
+}
+
+.schedule-title {
+    font-size: 1.1rem;
+    margin-bottom: 15px;
+    color: #2c3e50;
+}
+
+.schedule-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.schedule-list li {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 0;
+    color: #495057;
+    border-bottom: 1px solid #eee;
+}
+
+.schedule-list li:last-child {
+    border-bottom: none;
+}
+
+.schedule-list i {
+    color: #007bff;
+    font-size: 1rem;
+    width: 20px;
+}
+
+.schedule-list .day {
+    font-weight: 500;
+    min-width: 100px;
+}
+
+.schedule-list .time {
+    color: #6c757d;
+}
+
+.pricing-footer {
+    margin-top: 30px;
+}
+
+.btn-choose {
+    width: 100%;
+    padding: 12px 24px;
+    border: none;
+    border-radius: 10px;
+    background: #2c3e50;
+    color: white;
+    font-size: 1rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+}
+
+.btn-choose:hover {
+    background: #34495e;
+}
+
+.btn-choose.popular {
+    background: #007bff;
+}
+
+.btn-choose.popular:hover {
+    background: #0056b3;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .pricing-grid {
+        grid-template-columns: 1fr;
+        padding: 0 20px;
+    }
+
+    .pricing-card {
+        padding: 30px;
+    }
+
+    .price .amount {
+        font-size: 3rem;
+    }
+} 

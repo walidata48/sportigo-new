@@ -3,43 +3,211 @@
 {% block content %}
 <section class="asa-packages py-5">
     <div class="container">
-        <h2 class="text-center mb-5">ASA Swimming Pool Packages</h2>
+        <div class="text-center mb-5">
+            <h2 class="display-4">ASA Swimming Pool</h2>
+            <p class="lead text-muted">Choose your preferred swimming package</p>
+        </div>
         
-        <div class="row g-4 justify-content-center">
+        <div class="pricing-grid">
             {% for package in packages %}
-            <div class="col-md-6">
-                <div class="package-card">
-                    <div class="card-header">
-                        <h3>{{ package.package_name }}</h3>
-                        <div class="price">
-                            <span class="amount">Rp {{ "{:,}".format(package.price) }}</span>
-                            <span class="period">/{{ package.sessions_per_month }} sesi</span>
-                        </div>
+            <div class="pricing-card {% if package.is_morning_available %}popular{% endif %}">
+                {% if package.is_morning_available %}
+                <div class="popular-badge">Premium</div>
+                {% endif %}
+                
+                <div class="pricing-header">
+                    <h3 class="plan-name">{{ package.package_name }}</h3>
+                    <div class="price">
+                        <span class="currency">Rp</span>
+                        <span class="amount">{{ "{:,}".format(package.price)[:-4] }}</span>
+                        <span class="period">/{{ package.sessions_per_month }} sessions</span>
                     </div>
-                    <div class="card-body">
-                        <p class="description">{{ package.description }}</p>
-                        <div class="schedules">
-                            <h4>Jadwal:</h4>
-                            <ul>
-                                {% for schedule in package.schedules %}
-                                <li>
-                                    <i class="fas fa-clock"></i>
-                                    {{ schedule.day_name }}: 
+                </div>
+
+                <div class="pricing-body">
+                    <div class="description text-muted mb-4">{{ package.description }}</div>
+                    <div class="schedules">
+                        <h4 class="schedule-title">Available Schedule:</h4>
+                        <ul class="schedule-list">
+                            {% for schedule in package.schedules %}
+                            <li>
+                                <i class="far fa-clock"></i>
+                                <span class="day">{{ schedule.day_name }}</span>
+                                <span class="time">
                                     {{ schedule.start_time.strftime('%H:%M') }} - 
                                     {{ schedule.end_time.strftime('%H:%M') }}
-                                </li>
-                                {% endfor %}
-                            </ul>
-                        </div>
-                        <a href="{{ url_for('asa_schedule', package_id=package.id) }}" 
-                           class="btn btn-primary w-100">
-                            Pilih Paket
-                        </a>
+                                </span>
+                            </li>
+                            {% endfor %}
+                        </ul>
                     </div>
+                </div>
+
+                <div class="pricing-footer">
+                    <form action="{{ url_for('asa_book', package_id=package.id) }}" method="POST">
+                        <button type="submit" class="btn-choose {% if package.is_morning_available %}popular{% endif %}">
+                            Select Package
+                        </button>
+                    </form>
                 </div>
             </div>
             {% endfor %}
         </div>
     </div>
 </section>
+
+<!-- Payment Modal -->
+<div class="modal fade" id="paymentModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Payment Details</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="package-summary mb-4">
+                    <h6>Package Selected:</h6>
+                    <p id="selectedPackage" class="mb-2"></p>
+                    <h6>Total Amount:</h6>
+                    <p id="totalAmount" class="mb-3"></p>
+                </div>
+                <form id="paymentForm" action="{{ url_for('asa_payment') }}" method="POST">
+                    <input type="hidden" name="package_id" id="packageId">
+                    <div class="mb-3">
+                        <label class="form-label">Payment Method</label>
+                        <div class="payment-methods">
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="payment_method" value="transfer" checked>
+                                <label class="form-check-label">Bank Transfer</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="payment_method" value="qris">
+                                <label class="form-check-label">QRIS</label>
+                            </div>
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100">Proceed to Payment</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block styles %}
+<style>
+.package-card {
+    background: #fff;
+    border-radius: 15px;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.08);
+    transition: transform 0.3s, box-shadow 0.3s;
+    overflow: hidden;
+}
+
+.package-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+}
+
+.package-badge {
+    background: #e9ecef;
+    padding: 8px 20px;
+    border-radius: 20px;
+    font-size: 0.9rem;
+    color: #495057;
+}
+
+.badge-premium {
+    background: #ffd700;
+    color: #000;
+}
+
+.price-tag {
+    margin: 20px 0;
+}
+
+.price-tag .currency {
+    font-size: 1.2rem;
+    vertical-align: top;
+}
+
+.price-tag .amount {
+    font-size: 2.5rem;
+    font-weight: bold;
+    color: #2c3e50;
+}
+
+.price-tag .period {
+    color: #6c757d;
+    font-size: 0.9rem;
+}
+
+.schedule-title {
+    font-size: 1.1rem;
+    margin-bottom: 15px;
+    color: #2c3e50;
+}
+
+.schedule-list {
+    display: grid;
+    gap: 10px;
+}
+
+.schedule-item {
+    display: flex;
+    align-items: center;
+    padding: 10px;
+    background: #f8f9fa;
+    border-radius: 8px;
+}
+
+.day-badge {
+    background: #007bff;
+    color: white;
+    padding: 5px 10px;
+    border-radius: 5px;
+    margin-right: 15px;
+    font-weight: bold;
+    min-width: 60px;
+    text-align: center;
+}
+
+.time-info {
+    color: #495057;
+}
+
+.time-info i {
+    margin-right: 8px;
+    color: #6c757d;
+}
+
+.modal-content {
+    border-radius: 15px;
+}
+
+.package-summary {
+    background: #f8f9fa;
+    padding: 15px;
+    border-radius: 10px;
+}
+
+.payment-methods {
+    background: #fff;
+    padding: 15px;
+    border-radius: 10px;
+    border: 1px solid #dee2e6;
+}
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function showPaymentModal(packageId, packageName, price) {
+    document.getElementById('packageId').value = packageId;
+    document.getElementById('selectedPackage').textContent = packageName;
+    document.getElementById('totalAmount').textContent = 'Rp ' + price.toLocaleString();
+    
+    new bootstrap.Modal(document.getElementById('paymentModal')).show();
+}
+</script>
 {% endblock %} 
