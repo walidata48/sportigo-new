@@ -503,3 +503,40 @@
         margin-left: 10px;
     }
 } 
+
+.location-card {
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    padding: 20px;
+    height: 100%;
+    transition: transform 0.3s;
+}
+
+.location-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+}
+
+.schedule-list {
+    list-style: none;
+    padding: 0;
+}
+
+.schedule-list li {
+    margin-bottom: 10px;
+    font-size: 0.9em;
+}
+
+.monthly-price, .daily-price {
+    margin: 10px 0;
+}
+
+.price .amount {
+    font-size: 1.5em;
+    font-weight: bold;
+    color: #2c3e50;
+}
+
+.price .period {
+    color: #7f8c8d;
+} 

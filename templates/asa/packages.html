@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="asa-packages py-5">
+    <div class="container">
+        <h2 class="text-center mb-5">ASA Swimming Pool Packages</h2>
+        
+        <div class="row g-4 justify-content-center">
+            {% for package in packages %}
+            <div class="col-md-6">
+                <div class="package-card">
+                    <div class="card-header">
+                        <h3>{{ package.package_name }}</h3>
+                        <div class="price">
+                            <span class="amount">Rp {{ "{:,}".format(package.price) }}</span>
+                            <span class="period">/{{ package.sessions_per_month }} sesi</span>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <p class="description">{{ package.description }}</p>
+                        <div class="schedules">
+                            <h4>Jadwal:</h4>
+                            <ul>
+                                {% for schedule in package.schedules %}
+                                <li>
+                                    <i class="fas fa-clock"></i>
+                                    {{ schedule.day_name }}: 
+                                    {{ schedule.start_time.strftime('%H:%M') }} - 
+                                    {{ schedule.end_time.strftime('%H:%M') }}
+                                </li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                        <a href="{{ url_for('asa_schedule', package_id=package.id) }}" 
+                           class="btn btn-primary w-100">
+                            Pilih Paket
+                        </a>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</section>
+{% endblock %} 

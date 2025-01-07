@@ -5,6 +5,7 @@ import calendar
 from werkzeug.security import generate_password_hash, check_password_hash
 from functools import wraps
 from flask_migrate import Migrate
+from flask.cli import FlaskGroup
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://waliy:12345@localhost/swim'
@@ -54,6 +55,48 @@ class Coupon(db.Model):
     valid_until = db.Column(db.Date, nullable=True)
     is_active = db.Column(db.Boolean, default=True)
 
+class ASAPool(db.Model):
+    __tablename__ = 'asa_packages'
+    id = db.Column(db.Integer, primary_key=True)
+    package_name = db.Column(db.String(100), nullable=False)
+    price = db.Column(db.Integer, nullable=False)
+    description = db.Column(db.Text, nullable=True)
+    is_morning_available = db.Column(db.Boolean, default=False)  # For "Reguler + Pagi"
+    sessions_per_month = db.Column(db.Integer, default=12)  # Both packages have 12 sessions
+
+class ASASchedule(db.Model):
+    __tablename__ = 'asa_schedules'
+    id = db.Column(db.Integer, primary_key=True)
+    package_id = db.Column(db.Integer, db.ForeignKey('asa_packages.id'), nullable=False)
+    day_name = db.Column(db.String(10), nullable=False)
+    start_time = db.Column(db.Time, nullable=False)
+    end_time = db.Column(db.Time, nullable=False)
+    quota = db.Column(db.Integer, default=20)  # Adjust default quota as needed
+    
+    package = db.relationship('ASAPool', backref='schedules')
+
+class ASABooking(db.Model):
+    __tablename__ = 'asa_bookings'
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    package_id = db.Column(db.Integer, db.ForeignKey('asa_packages.id'), nullable=False)
+    booking_date = db.Column(db.DateTime, default=datetime.utcnow)
+    payment_status = db.Column(db.String(20), default='pending')
+    
+    package = db.relationship('ASAPool', backref='bookings')
+    user = db.relationship('User', backref='asa_bookings')
+    sessions = db.relationship('ASABookingSession', backref='booking')
+
+class ASABookingSession(db.Model):
+    __tablename__ = 'asa_booking_sessions'
+    id = db.Column(db.Integer, primary_key=True)
+    booking_id = db.Column(db.Integer, db.ForeignKey('asa_bookings.id'), nullable=False)
+    schedule_id = db.Column(db.Integer, db.ForeignKey('asa_schedules.id'), nullable=False)
+    session_date = db.Column(db.Date, nullable=False)
+    status = db.Column(db.String(20), default='scheduled')  # scheduled, completed, cancelled
+
+    schedule = db.relationship('ASASchedule')
+
 def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
@@ -64,7 +107,8 @@ def login_required(f):
 
 @app.route('/')
 def index():
-    return render_template('dashboard.html')
+    locations = Location.query.all()
+    return render_template('dashboard.html', locations=locations)
 
 @app.route('/dashboard')
 @login_required
@@ -518,6 +562,101 @@ def my_schedules():
         grouped_bookings=grouped_bookings,
         single_bookings=single_bookings
     )
+
+# Routes for ASA pool
+@app.route('/asa')
+def asa_packages():
+    packages = ASAPool.query.all()
+    return render_template('asa/packages.html', packages=packages)
+
+@app.route('/asa/schedule/<int:package_id>')
+@login_required
+def asa_schedule(package_id):
+    package = ASAPool.query.get_or_404(package_id)
+    schedules = ASASchedule.query.filter_by(package_id=package_id).all()
+    return render_template('asa/schedule.html', package=package, schedules=schedules)
+
+@app.route('/asa/book/<int:package_id>', methods=['POST'])
+@login_required
+def asa_book(package_id):
+    package = ASAPool.query.get_or_404(package_id)
+    
+    # Create booking
+    booking = ASABooking(
+        user_id=session['user_id'],
+        package_id=package_id
+    )
+    db.session.add(booking)
+    db.session.flush()
+
+    # Here you would add logic to create the booking sessions based on selected schedules
+    # This is just a placeholder - you'll need to implement the actual logic
+    selected_schedules = request.form.getlist('schedules')
+    
+    return redirect(url_for('asa_booking_confirmation', booking_id=booking.id))
+
+# Function to initialize ASA packages and schedules
+def initialize_asa_data():
+    # Create packages
+    regular_package = ASAPool(
+        package_name='Reguler',
+        price=350000,
+        description='3x per minggu (Selasa, Kamis, Sabtu sore)',
+        is_morning_available=False,
+        sessions_per_month=12
+    )
+
+    morning_package = ASAPool(
+        package_name='Reguler + Pagi',
+        price=400000,
+        description='6x per minggu (Senin, Rabu, Jumat pagi & Selasa, Kamis, Sabtu sore)',
+        is_morning_available=True,
+        sessions_per_month=12
+    )
+
+    db.session.add_all([regular_package, morning_package])
+    db.session.flush()
+
+    # Create schedules
+    schedules = []
+    
+    # Regular package schedules (afternoon only)
+    regular_schedules = [
+        ('SELASA', '16:00', '17:30'),
+        ('KAMIS', '16:00', '17:30'),
+        ('SABTU', '16:00', '17:30')
+    ]
+
+    for day, start, end in regular_schedules:
+        schedules.append(ASASchedule(
+            package_id=regular_package.id,
+            day_name=day,
+            start_time=datetime.strptime(start, '%H:%M').time(),
+            end_time=datetime.strptime(end, '%H:%M').time()
+        ))
+
+    # Regular + Morning package schedules (morning and afternoon)
+    morning_schedules = [
+        ('SENIN', '05:00', '06:30'),
+        ('SELASA', '16:00', '17:30'),
+        ('RABU', '05:00', '06:30'),
+        ('KAMIS', '16:00', '17:30'),
+        ('JUMAT', '05:00', '06:30'),
+        ('SABTU', '16:00', '17:30')
+    ]
+
+    for day, start, end in morning_schedules:
+        schedules.append(ASASchedule(
+            package_id=morning_package.id,
+            day_name=day,
+            start_time=datetime.strptime(start, '%H:%M').time(),
+            end_time=datetime.strptime(end, '%H:%M').time()
+        ))
+
+    db.session.add_all(schedules)
+    db.session.commit()
+
+
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5001)

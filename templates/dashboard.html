@@ -3,79 +3,40 @@
 {% block content %}
 <section class="dashboard-section py-5">
     <div class="container">
-        <h2 class="text-center mb-5">Pilih Paket Membership Anda</h2>
+        <h2 class="text-center mb-5">Pilih Lokasi Kolam Renang</h2>
         
         <div class="row g-4 justify-content-center">
-            <!-- Monthly Membership Card -->
+            {% for location in locations %}
             <div class="col-md-4">
-                <div class="membership-card active">
+                <div class="location-card">
                     <div class="card-header">
-                        <h3>Paket Bulanan</h3>
+                        <h3>{{ location.name }}</h3>
                         <div class="price">
-                            <span class="amount">Rp 800.000</span>
-                            <span class="period">/bulan</span>
+                            <div class="monthly-price">
+                                <span class="amount">Rp {{ "{:,}".format(location.monthly_price) }}</span>
+                                <span class="period">/4 sesi</span>
+                            </div>
+                            <div class="daily-price">
+                                <span class="amount">Rp {{ "{:,}".format(location.daily_price) }}</span>
+                                <span class="period">/sesi</span>
+                            </div>
                         </div>
                     </div>
                     <div class="card-body">
-                        <ul class="benefits-list">
-                            <li><i class="fas fa-check"></i> 12x pertemuan per bulan</li>
-                            <li><i class="fas fa-check"></i> Akses ke semua lokasi</li>
-                            <li><i class="fas fa-check"></i> Pelatih profesional</li>
-                            <li><i class="fas fa-check"></i> Jadwal fleksibel</li>
-                            <li><i class="fas fa-check"></i> Gratis konsultasi</li>
+                        <ul class="schedule-list">
+                            {% for quota in location.quotas %}
+                            <li>
+                                <i class="fas fa-clock"></i> 
+                                {{ quota.day_name }}: {{ quota.start_time.strftime('%H:%M') }} - {{ quota.end_time.strftime('%H:%M') }}
+                                (Kuota: {{ quota.quota }})
+                            </li>
+                            {% endfor %}
                         </ul>
-                        <a href="{{ url_for('booking_schedule') }}" class="btn btn-primary w-100">Pilih Paket</a>
+                        <a href="{{ url_for('booking_schedule', location_id=location.id) }}" class="btn btn-primary w-100">Pilih Lokasi</a>
                     </div>
                 </div>
             </div>
-
-            <!-- Daily Membership Card -->
-            <div class="col-md-4">
-                <div class="membership-card disabled">
-                    <div class="ribbon">Segera Hadir</div>
-                    <div class="card-header">
-                        <h3>Paket Harian</h3>
-                        <div class="price">
-                            <span class="amount">Rp 100.000</span>
-                            <span class="period">/hari</span>
-                        </div>
-                    </div>
-                    <div class="card-body">
-                        <ul class="benefits-list">
-                            <li><i class="fas fa-check"></i> 1x pertemuan</li>
-                            <li><i class="fas fa-check"></i> Lokasi terbatas</li>
-                            <li><i class="fas fa-check"></i> Pelatih profesional</li>
-                            <li><i class="fas fa-check"></i> Jadwal terbatas</li>
-                            <li><i class="fas fa-times"></i> Konsultasi berbayar</li>
-                        </ul>
-                        <button class="btn btn-secondary w-100" disabled>Segera Hadir</button>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Private Membership Card -->
-            <div class="col-md-4">
-                <div class="membership-card disabled">
-                    <div class="ribbon">Segera Hadir</div>
-                    <div class="card-header">
-                        <h3>Paket Private</h3>
-                        <div class="price">
-                            <span class="amount">Rp 1.500.000</span>
-                            <span class="period">/bulan</span>
-                        </div>
-                    </div>
-                    <div class="card-body">
-                        <ul class="benefits-list">
-                            <li><i class="fas fa-check"></i> 8x pertemuan private</li>
-                            <li><i class="fas fa-check"></i> Akses ke semua lokasi</li>
-                            <li><i class="fas fa-check"></i> Pelatih profesional khusus</li>
-                            <li><i class="fas fa-check"></i> Jadwal super fleksibel</li>
-                            <li><i class="fas fa-check"></i> Konsultasi unlimited</li>
-                        </ul>
-                        <button class="btn btn-secondary w-100" disabled>Segera Hadir</button>
-                    </div>
-                </div>
-            </div>
+            {% endfor %}
         </div>
     </div>
 </section>
