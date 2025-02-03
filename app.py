@@ -609,15 +609,28 @@ def asa_booking_confirmation(booking_id):
     
     return render_template('asa/booking_confirmation.html', 
                          booking=booking,
-                         package=package)
+                         package=package,
+                         datetime=datetime)
 
 @app.route('/update_asa_payment_status', methods=['POST'])
 @login_required
 def update_asa_payment_status():
     try:
         booking_id = request.form.get('booking_id')
+        start_date_str = request.form.get('start_date')
+        
+        if not start_date_str:
+            flash('Please select a start date', 'error')
+            return redirect(url_for('asa_booking_confirmation', booking_id=booking_id))
+        
         booking = ASABooking.query.get_or_404(booking_id)
         package = ASAPool.query.get(booking.package_id)
+        
+        # Parse start date
+        start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
+        
+        # Calculate end date (30 days from start date)
+        end_date = start_date + timedelta(days=29)  # 30 days period
         
         # Update booking status
         booking.payment_status = 'paid'
@@ -626,35 +639,39 @@ def update_asa_payment_status():
         # Get schedules for this package
         asa_schedules = ASASchedule.query.filter_by(package_id=package.id).all()
         
-        # Calculate next Monday
-        today = datetime.now().date()
-        days_until_monday = (7 - today.weekday()) % 7
-        next_monday = today + timedelta(days=days_until_monday)
-        
-        # Generate schedules for 4 weeks
+        # Generate schedules until end date
         schedules = []
-        for week in range(4):
+        current_date = start_date
+        
+        # Create day mapping
+        day_mapping = {
+            'SENIN': 0, 'SELASA': 1, 'RABU': 2, 'KAMIS': 3, 
+            'JUMAT': 4, 'SABTU': 5, 'MINGGU': 6
+        }
+        
+        while current_date <= end_date:
             for schedule in asa_schedules:
-                day_mapping = {
-                    'SENIN': 0, 'SELASA': 1, 'RABU': 2, 'KAMIS': 3, 
-                    'JUMAT': 4, 'SABTU': 5, 'MINGGU': 6
-                }
-                day_offset = day_mapping[schedule.day_name]
-                session_date = next_monday + timedelta(days=(week * 7) + day_offset)
-                
-                schedules.append(ASABookingSession(
-                    booking_id=booking.id,
-                    schedule_id=schedule.id,
-                    session_date=session_date,
-                    start_time=schedule.start_time,
-                    end_time=schedule.end_time,
-                    status='scheduled'
-                ))
+                # Check if current date's weekday matches schedule's day
+                if current_date.weekday() == day_mapping[schedule.day_name]:
+                    schedules.append(ASABookingSession(
+                        booking_id=booking.id,
+                        schedule_id=schedule.id,
+                        session_date=current_date,
+                        start_time=schedule.start_time,
+                        end_time=schedule.end_time,
+                        status='scheduled'
+                    ))
+            current_date += timedelta(days=1)
+        
+        # Verify we have at least 12 sessions
+        if len(schedules) < 12:
+            flash('Selected date range does not provide enough sessions. Please choose a different start date.', 'error')
+            return redirect(url_for('asa_booking_confirmation', booking_id=booking_id))
         
         db.session.add_all(schedules)
         db.session.commit()
         
-        flash('Payment successful!', 'success')
+        flash(f'Payment successful! {len(schedules)} sessions have been scheduled.', 'success')
         return redirect(url_for('asa_my_schedule', booking_id=booking.id))
         
     except Exception as e:

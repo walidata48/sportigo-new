@@ -35,10 +35,21 @@
 
                     {% if booking.payment_status == 'pending' %}
                     <div class="payment-actions mb-4">
+                        <div class="mb-3">
+                            <label for="start_date" class="form-label">Select Start Date</label>
+                            <input type="date" 
+                                   class="form-control" 
+                                   id="start_date" 
+                                   name="start_date" 
+                                   min="{{ datetime.now().strftime('%Y-%m-%d') }}" 
+                                   value="{{ datetime.now().strftime('%Y-%m-%d') }}"
+                                   required>
+                        </div>
                         <button type="button" 
                                 class="btn btn-success btn-lg w-100 mb-3"
                                 data-bs-toggle="modal" 
-                                data-bs-target="#paymentModal">
+                                data-bs-target="#paymentModal"
+                                onclick="showPaymentModal()">
                             Pay Now
                         </button>
                     </div>
@@ -53,6 +64,7 @@
                                 </div>
                                 <div class="modal-body">
                                     <p>Are you sure you want to proceed with the payment?</p>
+                                    <p>Start Date: <span id="confirmStartDate" class="fw-bold"></span></p>
                                     <p class="fw-bold">Amount: Rp {{ "{:,}".format(package.price - (booking.applied_discount or 0)) }}</p>
                                 </div>
                                 <div class="modal-footer">
@@ -60,12 +72,34 @@
                                     <form action="{{ url_for('update_asa_payment_status') }}" method="POST">
                                         <input type="hidden" name="booking_id" value="{{ booking.id }}">
                                         <input type="hidden" name="applied_discount" value="{{ booking.applied_discount or 0 }}">
+                                        <input type="hidden" name="start_date" id="form_start_date">
                                         <button type="submit" class="btn btn-success">Confirm Payment</button>
                                     </form>
                                 </div>
                             </div>
                         </div>
                     </div>
+
+                    <script>
+                    function formatDate(dateString) {
+                        const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+                        const date = new Date(dateString);
+                        return date.toLocaleDateString('id-ID', options);
+                    }
+
+                    function showPaymentModal() {
+                        const startDate = document.getElementById('start_date').value;
+                        if (!startDate) {
+                            alert('Please select a start date first');
+                            return;
+                        }
+                        
+                        // Set the formatted date in the modal
+                        document.getElementById('confirmStartDate').textContent = formatDate(startDate);
+                        // Set the date value in the hidden form field
+                        document.getElementById('form_start_date').value = startDate;
+                    }
+                    </script>
                     {% else %}
                     <div class="mt-4">
                         <a href="{{ url_for('asa_my_schedule', booking_id=booking.id) }}" 
