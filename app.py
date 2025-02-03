@@ -821,7 +821,44 @@ def initialize_asa_data():
     db.session.add_all(schedules)
     db.session.commit()
 
-
+@app.route('/home')
+@login_required
+def home():
+    # Add today's date
+    today = datetime.now().date()
+    
+    # Get regular swimming school bookings
+    swimming_school_bookings = Booking.query.filter_by(
+        user_id=session['user_id']
+    ).order_by(
+        Booking.session_date.desc(),
+        Booking.start_time
+    ).all()
+    
+    # Group swimming school bookings by group_id
+    grouped_bookings = {}
+    single_bookings = []
+    
+    for booking in swimming_school_bookings:
+        if booking.group_id:
+            if booking.group_id not in grouped_bookings:
+                grouped_bookings[booking.group_id] = []
+            grouped_bookings[booking.group_id].append(booking)
+        else:
+            single_bookings.append(booking)
+    
+    # Get ASA club bookings
+    asa_bookings = ASABooking.query.filter_by(
+        user_id=session['user_id']
+    ).order_by(
+        ASABooking.booking_date.desc()
+    ).all()
+    
+    return render_template('home.html',
+                         grouped_bookings=grouped_bookings,
+                         single_bookings=single_bookings,
+                         asa_bookings=asa_bookings,
+                         today=today)
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5001)

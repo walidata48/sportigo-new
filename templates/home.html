@@ -1,0 +1,194 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="home-section py-5">
+    <div class="container">
+        <h2 class="text-center mb-4">My Swimming Sessions</h2>
+
+        <!-- ASA Club Bookings -->
+        <div class="booking-section mb-5">
+            <h3>ASA Club Sessions</h3>
+            {% if asa_bookings %}
+                {% for booking in asa_bookings %}
+                    <div class="booking-card mb-3">
+                        <div class="card">
+                            <div class="card-body">
+                                <h5 class="card-title">{{ booking.package.package_name }}</h5>
+                                <p class="card-text">
+                                    <strong>Booked on:</strong> {{ booking.booking_date.strftime('%d %B %Y') }}<br>
+                                    <strong>Status:</strong> 
+                                    <span class="badge {% if booking.payment_status == 'paid' %}bg-success{% else %}bg-warning{% endif %}">
+                                        {{ booking.payment_status.title() }}
+                                    </span>
+                                </p>
+                                
+                                {% if booking.sessions %}
+                                    <div class="sessions-list mt-3">
+                                        <h6>Upcoming Sessions:</h6>
+                                        <ul class="list-unstyled">
+                                            {% for session in booking.sessions %}
+                                                {% if session.session_date >= today %}
+                                                    <li class="session-item">
+                                                        {{ session.session_date.strftime('%d %B %Y') }} 
+                                                        ({{ session.start_time.strftime('%H:%M') }} - {{ session.end_time.strftime('%H:%M') }})
+                                                        <span class="badge {% if session.status == 'completed' %}bg-success{% elif session.status == 'cancelled' %}bg-danger{% else %}bg-info{% endif %}">
+                                                            {{ session.status }}
+                                                        </span>
+                                                    </li>
+                                                {% endif %}
+                                            {% endfor %}
+                                        </ul>
+                                    </div>
+                                {% endif %}
+                                
+                                <a href="{{ url_for('asa_my_schedule', booking_id=booking.id) }}" class="btn btn-primary btn-sm mt-2">View Details</a>
+                            </div>
+                        </div>
+                    </div>
+                {% endfor %}
+            {% else %}
+                <p class="text-muted">No ASA Club bookings found.</p>
+            {% endif %}
+        </div>
+
+        <!-- Swimming School Bookings -->
+        <div class="booking-section mb-5">
+            <h3>Swimming School Sessions</h3>
+            
+            <!-- Package Bookings -->
+            {% if grouped_bookings %}
+                {% for group_id, bookings in grouped_bookings.items() %}
+                    <div class="booking-card mb-3">
+                        <div class="card">
+                            <div class="card-body">
+                                <h5 class="card-title">{{ bookings[0].location.name }}</h5>
+                                <p class="card-text">
+                                    <strong>Time:</strong> {{ bookings[0].start_time.strftime('%H:%M') }} - {{ bookings[0].end_time.strftime('%H:%M') }}<br>
+                                    <strong>Status:</strong> 
+                                    <span class="badge {% if bookings[0].payment_status == 'paid' %}bg-success{% else %}bg-warning{% endif %}">
+                                        {{ bookings[0].payment_status.title() }}
+                                    </span>
+                                </p>
+                                
+                                <div class="sessions-list mt-3">
+                                    <h6>Package Sessions:</h6>
+                                    <ul class="list-unstyled">
+                                        {% for booking in bookings|sort(attribute='session_date') %}
+                                            <li class="session-item">
+                                                {{ booking.session_date.strftime('%d %B %Y') }}
+                                                {% if booking.session_date < today %}
+                                                    <span class="badge bg-secondary">Completed</span>
+                                                {% endif %}
+                                            </li>
+                                        {% endfor %}
+                                    </ul>
+                                </div>
+                                
+                                <a href="{{ url_for('booking_confirmation', booking_id=bookings[0].id) }}" 
+                                   class="btn btn-primary btn-sm mt-2">View Details</a>
+                            </div>
+                        </div>
+                    </div>
+                {% endfor %}
+            {% endif %}
+            
+            <!-- Single Bookings -->
+            {% if single_bookings %}
+                {% for booking in single_bookings %}
+                    <div class="booking-card mb-3">
+                        <div class="card">
+                            <div class="card-body">
+                                <h5 class="card-title">{{ booking.location.name }}</h5>
+                                <p class="card-text">
+                                    <strong>Date:</strong> {{ booking.session_date.strftime('%d %B %Y') }}<br>
+                                    <strong>Time:</strong> {{ booking.start_time.strftime('%H:%M') }} - {{ booking.end_time.strftime('%H:%M') }}<br>
+                                    <strong>Status:</strong> 
+                                    <span class="badge {% if booking.payment_status == 'paid' %}bg-success{% else %}bg-warning{% endif %}">
+                                        {{ booking.payment_status.title() }}
+                                    </span>
+                                </p>
+                                <a href="{{ url_for('booking_confirmation', booking_id=booking.id) }}" 
+                                   class="btn btn-primary btn-sm mt-2">View Details</a>
+                            </div>
+                        </div>
+                    </div>
+                {% endfor %}
+            {% endif %}
+            
+            {% if not grouped_bookings and not single_bookings %}
+                <p class="text-muted">No Swimming School bookings found.</p>
+            {% endif %}
+        </div>
+
+        <!-- Private Lessons Section (for future implementation) -->
+        <div class="booking-section">
+            <h3>Private Lessons</h3>
+            <p class="text-muted">Private lessons booking coming soon!</p>
+        </div>
+    </div>
+</section>
+
+<style>
+.home-section h2 {
+    color: #333;
+    margin-bottom: 30px;
+}
+
+.booking-section {
+    background: #f8f9fa;
+    padding: 25px;
+    border-radius: 15px;
+}
+
+.booking-section h3 {
+    color: #444;
+    margin-bottom: 20px;
+    font-size: 1.5rem;
+}
+
+.booking-card .card {
+    border: none;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    transition: transform 0.2s ease;
+}
+
+.booking-card .card:hover {
+    transform: translateY(-3px);
+}
+
+.booking-card .card-title {
+    color: #007bff;
+    font-size: 1.2rem;
+}
+
+.sessions-list {
+    background: #f8f9fa;
+    padding: 15px;
+    border-radius: 8px;
+    margin-top: 15px;
+}
+
+.session-item {
+    padding: 8px 0;
+    border-bottom: 1px solid #eee;
+}
+
+.session-item:last-child {
+    border-bottom: none;
+}
+
+.badge {
+    padding: 6px 10px;
+    font-weight: 500;
+}
+
+.btn-primary {
+    background-color: #007bff;
+    border: none;
+}
+
+.btn-primary:hover {
+    background-color: #0056b3;
+}
+</style>
+{% endblock %} 
