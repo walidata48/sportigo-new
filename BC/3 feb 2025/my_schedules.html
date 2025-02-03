@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="schedule-section py-5">
+    <div class="container">
+        <h1 class="mb-4">My Swimming Schedules</h1>
+        
+        <!-- Package Bookings -->
+        {% if grouped_bookings %}
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h2 class="h5 mb-0">Package Bookings</h2>
+                </div>
+                <div class="card-body">
+                    {% for group_id, bookings in grouped_bookings.items() %}
+                        <div class="package-group mb-4">
+                            <h3 class="h6 mb-3">Package booked on {{ bookings[0].session_date.strftime('%d %B %Y') }}</h3>
+                            <div class="table-responsive">
+                                <table class="table table-hover">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>Date</th>
+                                            <th>Time</th>
+                                            <th>Location</th>
+                                            <th>Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for booking in bookings %}
+                                            <tr>
+                                                <td>{{ booking.session_date.strftime('%d %B %Y') }}</td>
+                                                <td>{{ booking.start_time.strftime('%H:%M') }} - {{ booking.end_time.strftime('%H:%M') }}</td>
+                                                <td>{{ booking.location.name }}</td>
+                                                <td>
+                                                    <span class="badge {% if booking.payment_status == 'paid' %}bg-success{% else %}bg-warning{% endif %}">
+                                                        {{ booking.payment_status|title }}
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
+        {% endif %}
+
+        <!-- Single Bookings -->
+        {% if single_bookings %}
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="h5 mb-0">Single Session Bookings</h2>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Time</th>
+                                    <th>Location</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for booking in single_bookings %}
+                                    <tr>
+                                        <td>{{ booking.session_date.strftime('%d %B %Y') }}</td>
+                                        <td>{{ booking.start_time.strftime('%H:%M') }} - {{ booking.end_time.strftime('%H:%M') }}</td>
+                                        <td>{{ booking.location.name }}</td>
+                                        <td>
+                                            <span class="badge {% if booking.payment_status == 'paid' %}bg-success{% else %}bg-warning{% endif %}">
+                                                {{ booking.payment_status|title }}
+                                            </span>
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        {% endif %}
+
+        {% if not grouped_bookings and not single_bookings %}
+            <div class="alert alert-info">
+                <i class="fas fa-info-circle me-2"></i>
+                You haven't made any bookings yet.
+            </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %} 

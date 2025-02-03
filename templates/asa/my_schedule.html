@@ -1,0 +1,146 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="schedule-header text-center mb-5">
+        <h2>My Swimming Schedule</h2>
+        <p class="text-muted">{{ package.package_name }}</p>
+    </div>
+
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="schedule-calendar">
+                {% set current_week = None %}
+                {% for session in sessions %}
+                    {% set week_number = ((session.session_date - sessions[0].session_date).days // 7) + 1 %}
+                    
+                    {% if week_number != current_week %}
+                        {% if current_week is not none %}
+                            </div> <!-- Close previous week -->
+                        {% endif %}
+                        <div class="week-schedule mb-4">
+                            <h4 class="week-title">Week {{ week_number }}</h4>
+                        {% set current_week = week_number %}
+                    {% endif %}
+
+                    <div class="session-card {% if session.status == 'completed' %}completed{% endif %}">
+                        <div class="session-date">
+                            <span class="day-name">{{ session.session_date.strftime('%A') }}</span>
+                            <span class="date">{{ session.session_date.strftime('%d %b %Y') }}</span>
+                        </div>
+                        <div class="session-time">
+                            <i class="far fa-clock"></i>
+                            {{ session.schedule.start_time.strftime('%H:%M') }} - 
+                            {{ session.schedule.end_time.strftime('%H:%M') }}
+                        </div>
+                        <div class="session-status">
+                            <span class="status-badge {{ session.status }}">
+                                {{ session.status|title }}
+                            </span>
+                        </div>
+                    </div>
+
+                    {% if loop.last %}
+                        </div> <!-- Close last week -->
+                    {% endif %}
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block styles %}
+<style>
+.schedule-calendar {
+    background: white;
+    border-radius: 15px;
+    padding: 30px;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.05);
+}
+
+.week-title {
+    margin-bottom: 20px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid #f0f0f0;
+    color: #2c3e50;
+}
+
+.session-card {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20px;
+    margin-bottom: 15px;
+    background: #f8f9fa;
+    border-radius: 10px;
+    transition: transform 0.2s;
+}
+
+.session-card:hover {
+    transform: translateX(5px);
+}
+
+.session-card.completed {
+    background: #e8f5e9;
+}
+
+.session-date {
+    display: flex;
+    flex-direction: column;
+}
+
+.day-name {
+    font-weight: bold;
+    color: #2c3e50;
+}
+
+.date {
+    color: #6c757d;
+    font-size: 0.9rem;
+}
+
+.session-time {
+    color: #2c3e50;
+}
+
+.session-time i {
+    color: #007bff;
+    margin-right: 8px;
+}
+
+.status-badge {
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 0.875rem;
+    font-weight: 500;
+}
+
+.status-badge.scheduled {
+    background: #e3f2fd;
+    color: #1976d2;
+}
+
+.status-badge.completed {
+    background: #e8f5e9;
+    color: #2e7d32;
+}
+
+.status-badge.cancelled {
+    background: #ffebee;
+    color: #c62828;
+}
+
+@media (max-width: 768px) {
+    .session-card {
+        flex-direction: column;
+        text-align: center;
+        gap: 10px;
+    }
+    
+    .session-date, .session-time, .session-status {
+        width: 100%;
+    }
+}
+</style>
+{% endblock %} 

@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="dashboard-section py-5">
+    <div class="container">
+        <h2 class="text-center mb-5">Pilih Lokasi Kolam Renang</h2>
+        
+        <div class="row g-4 justify-content-center">
+            {% for location in locations %}
+            <div class="col-md-4">
+                <div class="location-card">
+                    <div class="card-header">
+                        <h3>{{ location.name }}</h3>
+                        <div class="price">
+                            <div class="monthly-price">
+                                <span class="amount">Rp {{ "{:,}".format(location.monthly_price) }}</span>
+                                <span class="period">/4 sesi</span>
+                            </div>
+                            <div class="daily-price">
+                                <span class="amount">Rp {{ "{:,}".format(location.daily_price) }}</span>
+                                <span class="period">/sesi</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <ul class="schedule-list">
+                            {% for quota in location.quotas %}
+                            <li>
+                                <i class="fas fa-clock"></i> 
+                                {{ quota.day_name }}: {{ quota.start_time.strftime('%H:%M') }} - {{ quota.end_time.strftime('%H:%M') }}
+                                (Kuota: {{ quota.quota }})
+                            </li>
+                            {% endfor %}
+                        </ul>
+                        <a href="{{ url_for('booking_schedule', location_id=location.id) }}" class="btn btn-primary w-100">Pilih Lokasi</a>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</section>
+{% endblock %} 

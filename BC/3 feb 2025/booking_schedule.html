@@ -1,0 +1,195 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="booking-section py-5">
+    <div class="container">
+        <h2 class="text-center mb-5">Pilih Jadwal Latihan</h2>
+        
+        <div class="row">
+            <div class="col-lg-8 mx-auto">
+                <div class="booking-form">
+                    <form id="bookingForm" action="{{ url_for('process_booking') }}" method="POST">
+                        <!-- Location Selection -->
+                        <div class="mb-4">
+                            <label for="location" class="form-label">Lokasi</label>
+                            <select class="form-select" id="location" name="location" required>
+                                <option value="">Pilih Lokasi</option>
+                                {% for location in locations %}
+                                <option value="{{ location.id }}">{{ location.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <!-- Date Selection -->
+                        <div class="mb-4">
+                            <label for="date" class="form-label">Tanggal Mulai</label>
+                            <input type="date" class="form-control" id="date" name="date" required>
+                        </div>
+
+                        <!-- Time Slot Selection -->
+                        <div class="mb-4">
+                            <label class="form-label">Pilih Waktu</label>
+                            <div id="timeSlots" class="time-slots">
+                                <!-- Time slots will be populated dynamically -->
+                            </div>
+                        </div>
+
+                        <!-- Consecutive Dates Preview -->
+                        <div id="consecutiveDates" class="consecutive-dates mb-4" style="display: none;">
+                            <h4 class="mb-3">Jadwal 4 Minggu Kedepan:</h4>
+                            <div class="consecutive-dates-list">
+                                <!-- Will be populated dynamically -->
+                            </div>
+                        </div>
+
+                        <div class="text-center">
+                            <button type="submit" class="btn btn-primary" id="submitButton" disabled>
+                                Konfirmasi Booking
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const locationSelect = document.getElementById('location');
+    const dateInput = document.getElementById('date');
+    const timeSlotsDiv = document.getElementById('timeSlots');
+    const consecutiveDatesDiv = document.getElementById('consecutiveDates');
+    const consecutiveDatesList = document.querySelector('.consecutive-dates-list');
+    const submitButton = document.getElementById('submitButton');
+    const bookingForm = document.getElementById('bookingForm');
+
+    // Set minimum date to today
+    const today = new Date().toISOString().split('T')[0];
+    dateInput.min = today;
+
+    function updateTimeSlots() {
+        const locationId = locationSelect.value;
+        const date = dateInput.value;
+        
+        consecutiveDatesDiv.style.display = 'none';
+        submitButton.disabled = true;
+
+        if (locationId && date) {
+            fetch('/get_available_slots', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: `location_id=${locationId}&date=${date}`
+            })
+            .then(response => response.json())
+            .then(data => {
+                timeSlotsDiv.innerHTML = '';
+                data.available_slots.forEach(slot => {
+                    const disabled = slot.available <= 0;
+                    timeSlotsDiv.innerHTML += `
+                        <div class="time-slot-option">
+                            <input type="radio" name="timeSlot" 
+                                   id="slot_${slot.start_time}" 
+                                   value="${slot.start_time}-${slot.end_time}"
+                                   ${disabled ? 'disabled' : ''}>
+                            <label for="slot_${slot.start_time}" class="${disabled ? 'disabled' : ''}">
+                                ${slot.start_time} - ${slot.end_time}
+                                <span class="availability">${slot.available}/${slot.total_quota} tersedia</span>
+                            </label>
+                        </div>
+                    `;
+                });
+
+                // Add event listeners to new radio buttons
+                document.querySelectorAll('input[name="timeSlot"]').forEach(radio => {
+                    radio.addEventListener('change', checkConsecutiveDates);
+                });
+            });
+        }
+    }
+
+    function checkConsecutiveDates() {
+        const locationId = locationSelect.value;
+        const date = dateInput.value;
+        const timeSlot = document.querySelector('input[name="timeSlot"]:checked').value;
+        const [startTime, endTime] = timeSlot.split('-');
+
+        fetch('/get_consecutive_dates', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: `location_id=${locationId}&date=${date}&start_time=${startTime}&end_time=${endTime}`
+        })
+        .then(response => response.json())
+        .then(data => {
+            consecutiveDatesList.innerHTML = '';
+            let allDatesAvailable = true;
+
+            data.consecutive_dates.forEach(dateInfo => {
+                const availabilityClass = dateInfo.available_quota > 0 ? 'text-success' : 'text-danger';
+                consecutiveDatesList.innerHTML += `
+                    <div class="consecutive-date-item">
+                        <span class="date">${dateInfo.formatted_date}</span>
+                        <span class="time">${dateInfo.start_time} - ${dateInfo.end_time}</span>
+                        <span class="quota ${availabilityClass}">
+                            ${dateInfo.available_quota}/${dateInfo.total_quota} tersedia
+                        </span>
+                    </div>
+                `;
+                if (dateInfo.available_quota <= 0) {
+                    allDatesAvailable = false;
+                }
+            });
+
+            consecutiveDatesDiv.style.display = 'block';
+            submitButton.disabled = !allDatesAvailable;
+
+            if (!allDatesAvailable) {
+                alert('Beberapa jadwal tidak tersedia. Silakan pilih waktu lain.');
+            }
+        });
+    }
+
+    locationSelect.addEventListener('change', updateTimeSlots);
+    dateInput.addEventListener('change', updateTimeSlots);
+
+    bookingForm.addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        // Get the selected time slot
+        const selectedTimeSlot = document.querySelector('input[name="timeSlot"]:checked').value;
+        const [startTime, endTime] = selectedTimeSlot.split('-');
+        
+        // Create FormData object
+        const formData = new FormData();
+        formData.append('location_id', locationSelect.value);
+        formData.append('date', dateInput.value);
+        formData.append('start_time', startTime);
+        formData.append('end_time', endTime);
+
+        fetch('/book_session', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: new URLSearchParams(formData)
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                window.location.href = `/booking_confirmation/${data.booking_id}`;
+            } else {
+                alert(data.message || 'Terjadi kesalahan. Silakan coba lagi.');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Terjadi kesalahan. Silakan coba lagi.');
+        });
+    });
+});
+</script>
+{% endblock %} 

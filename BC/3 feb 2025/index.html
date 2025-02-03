@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+
+{% block content %}
+<!-- Hero Section -->
+<section class="hero-section">
+    <div class="container">
+        <div class="row align-items-center">
+            <div class="col-lg-6 hero-content">
+                <h5 class="text-primary mb-3">LATIH LEBIH PINTAR. BERENANG LEBIH KUAT</h5>
+                <h1 class="hero-title">Pengalaman Berenang yang Sederhana untuk Semua</h1>
+                <p class="hero-text">
+                    Pantau latihan Anda, dapatkan hasil yang lebih baik, dan jadilah versi terbaik dari diri Anda. 
+                    Kurangi berpikir, lebih banyak berenang.
+                </p>
+                <div class="d-flex flex-wrap gap-3">
+                    <a href="{{ url_for('signup') }}" class="btn btn-primary">Daftar Sekarang</a>
+                    <a href="#program" class="btn btn-outline-primary">Lihat Program</a>
+                </div>
+            </div>
+            <div class="col-lg-6 hero-image-container">
+                <img src="{{ url_for('static', filename='images/swimming.png') }}" alt="Swimming Illustration" class="hero-image">
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Features Section -->
+<section class="features-section py-5">
+    <div class="container">
+        <h2 class="text-center mb-5">Mengapa Memilih Kami?</h2>
+        <div class="row g-4">
+            <div class="col-md-4">
+                <div class="feature-card">
+                    <div class="feature-icon mb-3">
+                        <i class="fas fa-medal"></i>
+                    </div>
+                    <h3>Pelatih Berpengalaman</h3>
+                    <p>Tim pelatih kami tersertifikasi dan memiliki pengalaman bertahun-tahun dalam melatih renang.</p>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="feature-card">
+                    <div class="feature-icon mb-3">
+                        <i class="fas fa-users"></i>
+                    </div>
+                    <h3>Kelas Kecil</h3>
+                    <p>Rasio pelatih dan siswa yang kecil untuk memastikan setiap siswa mendapat perhatian maksimal.</p>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="feature-card">
+                    <div class="feature-icon mb-3">
+                        <i class="fas fa-clock"></i>
+                    </div>
+                    <h3>Jadwal Fleksibel</h3>
+                    <p>Pilih jadwal yang sesuai dengan kesibukan Anda dari berbagai pilihan waktu yang tersedia.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Programs Section -->
+<section id="program" class="programs-section py-5 bg-light">
+    <div class="container">
+        <h2 class="text-center mb-5">Program Kami</h2>
+        <div class="row g-4">
+            <div class="col-md-6 col-lg-4">
+                <div class="program-card">
+                    <h3>Kelas Pemula</h3>
+                    <p>Untuk mereka yang baru memulai perjalanan berenang mereka.</p>
+                    <ul class="program-features">
+                        <li>Teknik dasar berenang</li>
+                        <li>Pengenalan air</li>
+                        <li>Latihan pernapasan</li>
+                    </ul>
+                    <a href="{{ url_for('signup') }}" class="btn btn-primary">Mulai Sekarang</a>
+                </div>
+            </div>
+            <div class="col-md-6 col-lg-4">
+                <div class="program-card">
+                    <h3>Kelas Menengah</h3>
+                    <p>Tingkatkan teknik dan stamina Anda.</p>
+                    <ul class="program-features">
+                        <li>Penyempurnaan gaya</li>
+                        <li>Latihan endurance</li>
+                        <li>Teknik lanjutan</li>
+                    </ul>
+                    <a href="{{ url_for('signup') }}" class="btn btn-primary">Mulai Sekarang</a>
+                </div>
+            </div>
+            <div class="col-md-6 col-lg-4">
+                <div class="program-card">
+                    <h3>Kelas Kompetitif</h3>
+                    <p>Untuk mereka yang ingin berkompetisi.</p>
+                    <ul class="program-features">
+                        <li>Latihan intensif</li>
+                        <li>Persiapan kompetisi</li>
+                        <li>Program khusus</li>
+                    </ul>
+                    <a href="{{ url_for('signup') }}" class="btn btn-primary">Mulai Sekarang</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %} 
