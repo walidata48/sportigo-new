@@ -616,37 +616,30 @@ def asa_booking_confirmation(booking_id):
 def update_asa_payment_status():
     try:
         booking_id = request.form.get('booking_id')
-        applied_discount = request.form.get('applied_discount', type=int, default=0)
-        
-        if not booking_id:
-            return jsonify({
-                'success': False,
-                'message': 'Booking ID is required'
-            })
-
         booking = ASABooking.query.get_or_404(booking_id)
         package = ASAPool.query.get(booking.package_id)
         
-        # Update payment status and payment date
+        # Update booking status
         booking.payment_status = 'paid'
         booking.payment_date = datetime.now()
-        booking.applied_discount = applied_discount
         
-        # Calculate next Monday from today
+        # Get schedules for this package
+        asa_schedules = ASASchedule.query.filter_by(package_id=package.id).all()
+        
+        # Calculate next Monday
         today = datetime.now().date()
-        days_until_monday = (7 - today.weekday()) % 7  # Fix for when today is Monday
+        days_until_monday = (7 - today.weekday()) % 7
         next_monday = today + timedelta(days=days_until_monday)
         
         # Generate schedules for 4 weeks
         schedules = []
         for week in range(4):
-            for schedule in package.schedules:
+            for schedule in asa_schedules:
                 day_mapping = {
                     'SENIN': 0, 'SELASA': 1, 'RABU': 2, 'KAMIS': 3, 
                     'JUMAT': 4, 'SABTU': 5, 'MINGGU': 6
                 }
                 day_offset = day_mapping[schedule.day_name]
-                
                 session_date = next_monday + timedelta(days=(week * 7) + day_offset)
                 
                 schedules.append(ASABookingSession(
@@ -661,20 +654,13 @@ def update_asa_payment_status():
         db.session.add_all(schedules)
         db.session.commit()
         
-        print(f"Created {len(schedules)} sessions for booking {booking_id}")  # Debug log
-        
-        return jsonify({
-            'success': True,
-            'redirect_url': url_for('asa_my_schedule', booking_id=booking.id)
-        })
+        flash('Payment successful!', 'success')
+        return redirect(url_for('asa_my_schedule', booking_id=booking.id))
         
     except Exception as e:
         db.session.rollback()
-        print(f"Error in update_asa_payment_status: {str(e)}")  # Debug log
-        return jsonify({
-            'success': False,
-            'message': f'Error: {str(e)}'
-        })
+        flash(f'Payment failed: {str(e)}', 'error')
+        return redirect(url_for('asa_booking_confirmation', booking_id=booking_id))
 
 @app.route('/asa/my_schedule/<int:booking_id>')
 @login_required

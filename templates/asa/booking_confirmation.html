@@ -35,11 +35,36 @@
 
                     {% if booking.payment_status == 'pending' %}
                     <div class="payment-actions mb-4">
-                        <!-- Add CSRF token if you're using Flask-WTF -->
-                        <button onclick="handlePayment({{ booking.id }})" 
-                                class="btn btn-success btn-lg w-100 mb-3">
+                        <button type="button" 
+                                class="btn btn-success btn-lg w-100 mb-3"
+                                data-bs-toggle="modal" 
+                                data-bs-target="#paymentModal">
                             Pay Now
                         </button>
+                    </div>
+
+                    <!-- Payment Modal -->
+                    <div class="modal fade" id="paymentModal">
+                        <div class="modal-dialog">
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <h5 class="modal-title">Confirm Payment</h5>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                </div>
+                                <div class="modal-body">
+                                    <p>Are you sure you want to proceed with the payment?</p>
+                                    <p class="fw-bold">Amount: Rp {{ "{:,}".format(package.price - (booking.applied_discount or 0)) }}</p>
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                    <form action="{{ url_for('update_asa_payment_status') }}" method="POST">
+                                        <input type="hidden" name="booking_id" value="{{ booking.id }}">
+                                        <input type="hidden" name="applied_discount" value="{{ booking.applied_discount or 0 }}">
+                                        <button type="submit" class="btn btn-success">Confirm Payment</button>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                     {% else %}
                     <div class="mt-4">
@@ -113,39 +138,46 @@
 
 {% block scripts %}
 <script>
-function handlePayment(bookingId) {
-    // Disable the button to prevent double-clicks
-    const payButton = event.target;
-    payButton.disabled = true;
-    payButton.textContent = 'Processing...';
+function processPayment() {
+    // Get the confirm button
+    const confirmBtn = document.querySelector('#paymentModal .modal-footer .btn-success');
+    
+    // Disable button and show loading state
+    confirmBtn.disabled = true;
+    confirmBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Processing...';
 
+    // Send payment request
     fetch('{{ url_for("update_asa_payment_status") }}', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/x-www-form-urlencoded',
-            'X-Requested-With': 'XMLHttpRequest'  // Add this header
         },
-        body: `booking_id=${bookingId}&applied_discount={{ booking.applied_discount or 0 }}`
+        body: new URLSearchParams({
+            'booking_id': '{{ booking.id }}',
+            'applied_discount': '{{ booking.applied_discount or 0 }}'
+        })
     })
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            console.log('Payment successful, redirecting...');
+            // Hide modal
+            const modal = bootstrap.Modal.getInstance(document.getElementById('paymentModal'));
+            modal.hide();
+            
+            // Show success message
+            alert('Payment successful!');
+            
+            // Redirect to schedule page
             window.location.href = data.redirect_url;
         } else {
-            console.error('Payment failed:', data.message);
-            alert('Error: ' + data.message);
-            // Re-enable the button if there's an error
-            payButton.disabled = false;
-            payButton.textContent = 'Pay Now';
+            throw new Error(data.message || 'Payment failed');
         }
     })
     .catch(error => {
-        console.error('Error:', error);
-        alert('An error occurred while processing payment');
-        // Re-enable the button if there's an error
-        payButton.disabled = false;
-        payButton.textContent = 'Pay Now';
+        alert('An error occurred during payment: ' + error.message);
+        // Reset button state
+        confirmBtn.disabled = false;
+        confirmBtn.innerHTML = 'Confirm Payment';
     });
 }
 </script>
