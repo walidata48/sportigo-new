@@ -31,20 +31,29 @@
 
         <!-- Swimming School Section -->
         <div class="category-section mb-5">
-            <h3 class="text-center mb-4">Swimming School</h3>
+            <h3 class="text-center mb-4">Swimming School Program</h3>
             <div class="col-md-10 mx-auto">
                 <div class="program-card">
                     <h4>Swimming School Program</h4>
-                    <div class="location-info">
-                        <p>Lokasi:</p>
-                        <ul class="pool-list">
-                            <li>BBS2 Pool</li>
-                            <li>Rakata Pool</li>
-                            <li>KCC Pool</li>
-                            <li>ASA Pool</li>
-                        </ul>
+                    <div class="pools-container">
+                        {% for location in locations %}
+                        <div class="pool-card">
+                            <h5>{{ location.name }}</h5>
+                            <div class="pool-details">
+                                
+                                <div class="schedule-info">
+                                    {% for quota in location.quotas %}
+                                    <div class="schedule-item">
+                                        <span class="day">{{ quota.day_name }}</span>
+                                        <span class="time">{{ quota.start_time.strftime('%H:%M') }}</span>
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
                     </div>
-                    <a href="{{ url_for('booking_schedule') }}" class="btn btn-primary w-100">Pilih Jadwal</a>
+                    <a href="{{ url_for('booking_schedule') }}" class="btn btn-primary w-100 mt-4">Pilih Jadwal</a>
                 </div>
             </div>
         </div>
@@ -142,6 +151,93 @@
 .btn-secondary {
     background-color: #6c757d;
     border: none;
+}
+
+.pools-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 20px;
+    margin: 20px 0;
+}
+
+.pool-card {
+    background: #f8f9fa;
+    border-radius: 10px;
+    padding: 15px;
+    transition: transform 0.2s;
+}
+
+.pool-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+}
+
+.pool-card h5 {
+    color: #007bff;
+    font-size: 1.1rem;
+    margin-bottom: 15px;
+    padding-bottom: 8px;
+    border-bottom: 2px solid #e9ecef;
+}
+
+.pool-details {
+    font-size: 0.9rem;
+}
+
+.price-info {
+    margin-bottom: 15px;
+}
+
+.price-info p {
+    margin-bottom: 5px;
+    color: #495057;
+}
+
+.price-info i {
+    width: 20px;
+    color: #6c757d;
+    margin-right: 5px;
+}
+
+.schedule-info {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.schedule-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 5px 10px;
+    background: white;
+    border-radius: 5px;
+    font-size: 0.85rem;
+}
+
+.schedule-item .day {
+    font-weight: 500;
+    color: #495057;
+}
+
+.schedule-item .time {
+    color: #6c757d;
+}
+
+@media (max-width: 768px) {
+    .pools-container {
+        grid-template-columns: 1fr;
+    }
+    
+    .pool-card {
+        margin-bottom: 15px;
+    }
+    
+    .schedule-item {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 5px;
+    }
 }
 </style>
 {% endblock %} 
