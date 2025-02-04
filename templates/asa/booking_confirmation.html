@@ -35,15 +35,12 @@
 
                     {% if booking.payment_status == 'pending' %}
                     <div class="payment-actions mb-4">
-                        <div class="mb-3">
-                            <label for="start_date" class="form-label">Select Start Date</label>
-                            <input type="date" 
-                                   class="form-control" 
-                                   id="start_date" 
-                                   name="start_date" 
-                                   min="{{ datetime.now().strftime('%Y-%m-%d') }}" 
-                                   value="{{ datetime.now().strftime('%Y-%m-%d') }}"
-                                   required>
+                        <div class="form-group mb-3">
+                            <label for="start_date">Select Start Date:</label>
+                            <input type="date" class="form-control" id="start_date" name="start_date" required>
+                            <small class="form-text text-muted">
+                                Trial sessions are available on Tuesday (Selasa), Thursday (Kamis), and Saturday (Sabtu) only.
+                            </small>
                         </div>
                         
                         <!-- Add coupon input section -->
@@ -91,7 +88,7 @@
                                 </div>
                                 <div class="modal-footer">
                                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                                    <form action="{{ url_for('update_asa_payment_status') }}" method="POST">
+                                    <form id="paymentForm" method="POST" action="{{ url_for('update_asa_payment_status') }}">
                                         <input type="hidden" name="booking_id" value="{{ booking.id }}">
                                         <input type="hidden" name="applied_discount" value="{{ booking.applied_discount or 0 }}">
                                         <input type="hidden" name="start_date" id="form_start_date">
@@ -180,6 +177,51 @@
                         // Update the form's applied discount
                         document.querySelector('input[name="applied_discount"]').value = appliedDiscount;
                     }
+
+                    // Add this function to validate available days
+                    function validateDate(date) {
+                        const dayOfWeek = new Date(date).getDay();
+                        // 2 = Tuesday (Selasa), 4 = Thursday (Kamis), 6 = Saturday (Sabtu)
+                        const validDays = [2, 4, 6];  // These numbers correspond to the same days in any language
+                        return validDays.includes(dayOfWeek);
+                    }
+
+                    // Add this to your existing script
+                    document.getElementById('start_date').addEventListener('change', function(e) {
+                        if (!validateDate(this.value)) {
+                            alert('Please select either Tuesday (Selasa), Thursday (Kamis), or Saturday (Sabtu) for trial sessions.');
+                            this.value = ''; // Clear the invalid date
+                        }
+                    });
+
+                    document.getElementById('paymentForm').addEventListener('submit', function(e) {
+                        e.preventDefault();
+                        
+                        const startDate = document.getElementById('start_date').value;
+                        if (!validateDate(startDate)) {
+                            alert('Please select either Tuesday (Selasa), Thursday (Kamis), or Saturday (Sabtu) for trial sessions.');
+                            return;
+                        }
+                        
+                        const formData = new FormData(this);
+                        
+                        fetch('{{ url_for("update_asa_payment_status") }}', {
+                            method: 'POST',
+                            body: formData
+                        })
+                        .then(response => response.json())
+                        .then(data => {
+                            if (data.success) {
+                                window.location.href = '{{ url_for("home") }}';
+                            } else {
+                                alert(data.message || 'An error occurred');
+                            }
+                        })
+                        .catch(error => {
+                            console.error('Error:', error);
+                            alert('An error occurred while processing payment');
+                        });
+                    });
                     </script>
                     {% else %}
                     <div class="mt-4">
@@ -253,46 +295,57 @@
 
 {% block scripts %}
 <script>
-function processPayment() {
-    // Get the confirm button
-    const confirmBtn = document.querySelector('#paymentModal .modal-footer .btn-success');
+document.getElementById('paymentForm').addEventListener('submit', function(e) {
+    e.preventDefault();
     
-    // Disable button and show loading state
-    confirmBtn.disabled = true;
-    confirmBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Processing...';
-
-    // Send payment request
+    const formData = new FormData(this);
+    
     fetch('{{ url_for("update_asa_payment_status") }}', {
         method: 'POST',
-        headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: new URLSearchParams({
-            'booking_id': '{{ booking.id }}',
-            'applied_discount': '{{ booking.applied_discount or 0 }}'
-        })
+        body: formData
     })
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            // Hide modal
-            const modal = bootstrap.Modal.getInstance(document.getElementById('paymentModal'));
-            modal.hide();
-            
-            // Show success message
-            alert('Payment successful!');
-            
-            // Redirect to schedule page
-            window.location.href = data.redirect_url;
+            window.location.href = '{{ url_for("home") }}';
         } else {
-            throw new Error(data.message || 'Payment failed');
+            alert(data.message || 'An error occurred');
         }
     })
     .catch(error => {
-        alert('An error occurred during payment: ' + error.message);
-        // Reset button state
-        confirmBtn.disabled = false;
-        confirmBtn.innerHTML = 'Confirm Payment';
+        console.error('Error:', error);
+        alert('An error occurred while processing payment');
+    });
+});
+
+function applyCoupon() {
+    const couponCode = document.getElementById('coupon_code').value;
+    const packagePrice = {{ package.price }};
+
+    fetch('{{ url_for("apply_asa_coupon") }}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: `coupon_code=${couponCode}&package_price=${packagePrice}`
+    })
+    .then(response => response.json())
+    .then(data => {
+        const discountInfo = document.getElementById('discountInfo');
+        if (data.success) {
+            document.getElementById('applied_discount').value = data.discount_amount;
+            discountInfo.textContent = data.message;
+            discountInfo.style.display = 'block';
+            discountInfo.className = 'alert alert-success';
+        } else {
+            discountInfo.textContent = data.message;
+            discountInfo.style.display = 'block';
+            discountInfo.className = 'alert alert-danger';
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error applying coupon');
     });
 }
 </script>

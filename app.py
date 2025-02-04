@@ -645,65 +645,130 @@ def update_asa_payment_status():
         applied_discount = request.form.get('applied_discount', type=int) or 0
         
         if not start_date_str:
-            flash('Please select a start date', 'error')
-            return redirect(url_for('asa_booking_confirmation', booking_id=booking_id))
+            return jsonify({
+                'success': False,
+                'message': 'Please select a start date'
+            })
         
         booking = ASABooking.query.get_or_404(booking_id)
         package = ASAPool.query.get(booking.package_id)
         
-        # Update booking with discount
+        # Update booking with discount and payment status
         booking.applied_discount = applied_discount
-        
-        # Calculate end date (30 days from start date)
-        start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
-        end_date = start_date + timedelta(days=29)  # 30 days period
-        
-        # Update booking status
         booking.payment_status = 'paid'
         booking.payment_date = datetime.now()
         
-        # Get schedules for this package
-        asa_schedules = ASASchedule.query.filter_by(package_id=package.id).all()
-        
-        # Generate schedules until end date
-        schedules = []
-        current_date = start_date
-        
-        # Create day mapping
-        day_mapping = {
-            'SENIN': 0, 'SELASA': 1, 'RABU': 2, 'KAMIS': 3, 
-            'JUMAT': 4, 'SABTU': 5, 'MINGGU': 6
-        }
-        
-        while current_date <= end_date:
-            for schedule in asa_schedules:
-                # Check if current date's weekday matches schedule's day
-                if current_date.weekday() == day_mapping[schedule.day_name]:
-                    schedules.append(ASABookingSession(
-                        booking_id=booking.id,
-                        schedule_id=schedule.id,
-                        session_date=current_date,
-                        start_time=schedule.start_time,
-                        end_time=schedule.end_time,
-                        status='scheduled'
-                    ))
-            current_date += timedelta(days=1)
-        
-        # Verify we have at least 12 sessions
-        if len(schedules) < 12:
-            flash('Selected date range does not provide enough sessions. Please choose a different start date.', 'error')
-            return redirect(url_for('asa_booking_confirmation', booking_id=booking_id))
-        
-        db.session.add_all(schedules)
-        db.session.commit()
-        
-        flash(f'Payment successful! {len(schedules)} sessions have been scheduled.', 'success')
-        return redirect(url_for('asa_my_schedule', booking_id=booking.id))
+        # Different handling for trial vs regular packages
+        if package.is_trial:
+            # For trial, only create one session on the selected date
+            start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
+            
+            # Get available schedule for that day
+            day_name = calendar.day_name[start_date.weekday()]
+            # Convert English day name to Indonesian
+            day_mapping = {
+                'Monday': 'SENIN',
+                'Tuesday': 'SELASA',
+                'Wednesday': 'RABU',
+                'Thursday': 'KAMIS',
+                'Friday': 'JUMAT',
+                'Saturday': 'SABTU',
+                'Sunday': 'MINGGU'
+            }
+            indo_day = day_mapping.get(day_name)
+            
+            # Debug prints
+            print("Debug Information:")
+            print(f"Selected date: {start_date}")
+            print(f"Day name from calendar: {day_name}")
+            print(f"Converted to Indonesian: {indo_day}")
+            
+            # Get all schedules for debugging
+            all_schedules = ASASchedule.query.filter_by(package_id=package.id).all()
+            print("\nAvailable schedules in database:")
+            for s in all_schedules:
+                print(f"Day: {s.day_name}, Time: {s.start_time}-{s.end_time}")
+            
+            # Try to find the schedule
+            schedule = ASASchedule.query.filter_by(
+                package_id=package.id,
+                day_name=indo_day
+            ).first()
+            
+            if not schedule:
+                return jsonify({
+                    'success': False,
+                    'message': f'Debug: Looking for {indo_day}, Available days: {[s.day_name for s in all_schedules]}'
+                })
+            
+            session = ASABookingSession(
+                booking_id=booking.id,
+                schedule_id=schedule.id,
+                session_date=start_date,
+                start_time=schedule.start_time,
+                end_time=schedule.end_time,
+                status='scheduled'
+            )
+            db.session.add(session)
+            
+            db.session.commit()
+            return jsonify({
+                'success': True,
+                'message': 'Trial session payment successful! Your session has been scheduled.'
+            })
+            
+        else:
+            # Regular package logic
+            start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
+            end_date = start_date + timedelta(days=29)
+            
+            # Get schedules for this package
+            asa_schedules = ASASchedule.query.filter_by(package_id=package.id).all()
+            
+            # Generate schedules until end date
+            schedules = []
+            current_date = start_date
+            
+            # Create day mapping
+            day_mapping = {
+                'SENIN': 0, 'SELASA': 1, 'RABU': 2, 'KAMIS': 3, 
+                'JUMAT': 4, 'SABTU': 5, 'MINGGU': 6
+            }
+            
+            while current_date <= end_date:
+                for schedule in asa_schedules:
+                    if current_date.weekday() == day_mapping[schedule.day_name]:
+                        schedules.append(ASABookingSession(
+                            booking_id=booking.id,
+                            schedule_id=schedule.id,
+                            session_date=current_date,
+                            start_time=schedule.start_time,
+                            end_time=schedule.end_time,
+                            status='scheduled'
+                        ))
+                current_date += timedelta(days=1)
+            
+            # Verify we have at least 12 sessions for regular packages
+            if len(schedules) < 12:
+                return jsonify({
+                    'success': False,
+                    'message': 'Selected date range does not provide enough sessions. Please choose a different start date.'
+                })
+            
+            db.session.add_all(schedules)
+            db.session.commit()
+            
+            return jsonify({
+                'success': True,
+                'message': 'Payment successful! Your sessions have been scheduled.'
+            })
         
     except Exception as e:
         db.session.rollback()
-        flash(f'Payment failed: {str(e)}', 'error')
-        return redirect(url_for('asa_booking_confirmation', booking_id=booking_id))
+        return jsonify({
+            'success': False,
+            'message': f'Payment failed: {str(e)}'
+        })
 
 @app.route('/asa/my_schedule/<int:booking_id>')
 @login_required
