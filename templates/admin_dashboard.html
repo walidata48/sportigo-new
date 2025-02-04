@@ -1,0 +1,243 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container py-5">
+    <h1 class="mb-4">Admin Dashboard</h1>
+    
+    <!-- Navigation Tabs -->
+    <ul class="nav nav-tabs mb-4" id="adminTabs" role="tablist">
+        <li class="nav-item">
+            <a class="nav-link active" id="swimming-school-tab" data-bs-toggle="tab" href="#swimming-school" role="tab">
+                Swimming School
+            </a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" id="swimming-club-tab" data-bs-toggle="tab" href="#swimming-club" role="tab">
+                Swimming Club (ASA)
+            </a>
+        </li>
+    </ul>
+    
+    <!-- Tab Content -->
+    <div class="tab-content" id="adminTabContent">
+        <!-- Swimming School Tab -->
+        <div class="tab-pane fade show active" id="swimming-school" role="tabpanel">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title mb-0">Swimming School Bookings</h3>
+                </div>
+                <div class="card-body">
+                    <!-- Location Quotas -->
+                    <div class="mb-4">
+                        <h4>Location Quotas</h4>
+                        <div class="table-responsive">
+                            <table class="table table-bordered">
+                                <thead>
+                                    <tr>
+                                        <th>Location</th>
+                                        <th>Day</th>
+                                        <th>Time</th>
+                                        <th>Total Quota</th>
+                                        <th>Available Quota</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for location in locations %}
+                                        {% for quota in location.quotas %}
+                                        <tr>
+                                            <td>{{ location.name }}</td>
+                                            <td>{{ quota.day_name | translate_day }}</td>
+                                            <td>{{ quota.start_time.strftime('%H:%M') }} - {{ quota.end_time.strftime('%H:%M') }}</td>
+                                            <td>{{ quota.quota }}</td>
+                                            <td>
+                                                {% set booked = namespace(count=0) %}
+                                                {% for booking in swimming_school_bookings %}
+                                                    {% if booking.location_id == location.id and 
+                                                        booking.start_time == quota.start_time and 
+                                                        booking.end_time == quota.end_time %}
+                                                        {% set booked.count = booked.count + 1 %}
+                                                    {% endif %}
+                                                {% endfor %}
+                                                {{ quota.quota - booked.count }}
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    
+                    <!-- Bookings List -->
+                    <div>
+                        <h4>Recent Bookings</h4>
+                        <div class="table-responsive">
+                            <table class="table table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>User</th>
+                                        <th>Location</th>
+                                        <th>Date</th>
+                                        <th>Time</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for booking in swimming_school_bookings %}
+                                    <tr>
+                                        <td>{{ booking.user.username }}</td>
+                                        <td>{{ booking.location.name }}</td>
+                                        <td>{{ booking.session_date.strftime('%d %B %Y') }}</td>
+                                        <td>{{ booking.start_time.strftime('%H:%M') }} - {{ booking.end_time.strftime('%H:%M') }}</td>
+                                        <td>
+                                            <span class="badge bg-{{ 'success' if booking.payment_status == 'paid' else 'warning' }}">
+                                                {{ booking.payment_status }}
+                                            </span>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Swimming Club (ASA) Tab -->
+        <div class="tab-pane fade" id="swimming-club" role="tabpanel">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title mb-0">ASA Club Bookings</h3>
+                </div>
+                <div class="card-body">
+                    <!-- Schedule Quotas -->
+                    <div class="mb-4">
+                        <h4>Schedule Quotas</h4>
+                        <div class="table-responsive">
+                            <table class="table table-bordered">
+                                <thead>
+                                    <tr>
+                                        <th>Day</th>
+                                        <th>Time</th>
+                                        <th>Total Quota</th>
+                                        <th>Available Quota</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for schedule in asa_schedules %}
+                                    <tr>
+                                        <td>{{ schedule.day_name | translate_day }}</td>
+                                        <td>{{ schedule.start_time.strftime('%H:%M') }} - {{ schedule.end_time.strftime('%H:%M') }}</td>
+                                        <td>{{ schedule.quota }}</td>
+                                        <td>
+                                            {% set booked = namespace(count=0) %}
+                                            {% for booking in asa_bookings %}
+                                                {% for session in booking.sessions %}
+                                                    {% if session.schedule_id == schedule.id %}
+                                                        {% set booked.count = booked.count + 1 %}
+                                                    {% endif %}
+                                                {% endfor %}
+                                            {% endfor %}
+                                            {{ schedule.quota - booked.count }}
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    
+                    <!-- Bookings List -->
+                    <div>
+                        <h4>Recent Bookings</h4>
+                        <div class="table-responsive">
+                            <table class="table table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>User</th>
+                                        <th>Package</th>
+                                        <th>Booking Date</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for booking in asa_bookings %}
+                                    <tr>
+                                        <td>{{ booking.user.username }}</td>
+                                        <td>{{ booking.package.package_name }}</td>
+                                        <td>{{ booking.booking_date.strftime('%d %B %Y') }}</td>
+                                        <td>
+                                            <span class="badge bg-{{ 'success' if booking.payment_status == 'paid' else 'warning' }}">
+                                                {{ booking.payment_status }}
+                                            </span>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.card {
+    border: none;
+    box-shadow: 0 0 20px rgba(0,0,0,0.08);
+    border-radius: 15px;
+    margin-bottom: 2rem;
+}
+
+.card-header {
+    background-color: #f8f9fa;
+    border-bottom: 1px solid rgba(0,0,0,0.05);
+    padding: 1.5rem;
+    border-radius: 15px 15px 0 0;
+}
+
+.card-body {
+    padding: 1.5rem;
+}
+
+.nav-tabs {
+    border-bottom: 2px solid #dee2e6;
+}
+
+.nav-tabs .nav-link {
+    border: none;
+    color: #6c757d;
+    font-weight: 500;
+    padding: 1rem 1.5rem;
+    transition: all 0.3s ease;
+}
+
+.nav-tabs .nav-link:hover {
+    border: none;
+    color: #007bff;
+}
+
+.nav-tabs .nav-link.active {
+    border: none;
+    color: #007bff;
+    border-bottom: 2px solid #007bff;
+}
+
+.table {
+    margin-bottom: 0;
+}
+
+.table th {
+    background-color: #f8f9fa;
+    font-weight: 600;
+}
+
+.badge {
+    padding: 0.5em 1em;
+    font-weight: 500;
+}
+</style>
+{% endblock %}

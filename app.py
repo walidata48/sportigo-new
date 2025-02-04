@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, jsonify, redirect, url_for, flash, session
+from flask import Flask, render_template, request, jsonify, redirect, url_for, flash, session, g
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime, timedelta
 import calendar
@@ -62,6 +62,7 @@ class User(db.Model):
     username = db.Column(db.String(80), unique=True, nullable=False)
     email = db.Column(db.String(120), unique=True, nullable=False)
     password_hash = db.Column(db.String(255), nullable=False)
+    is_admin = db.Column(db.Boolean, default=False)
     bookings = db.relationship('Booking', backref='user', lazy=True)
 
 class Coupon(db.Model):
@@ -128,6 +129,24 @@ def login_required(f):
             return redirect(url_for('login'))
         return f(*args, **kwargs)
     return decorated_function
+
+def admin_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'user_id' not in session:
+            return redirect(url_for('login'))
+        user = User.query.get(session['user_id'])
+        if not user or not user.is_admin:
+            flash('Access denied. Admin privileges required.', 'error')
+            return redirect(url_for('index'))
+        return f(*args, **kwargs)
+    return decorated_function
+
+@app.before_request
+def load_user():
+    g.user = None
+    if 'user_id' in session:
+        g.user = User.query.get(session['user_id'])
 
 @app.route('/')
 def index():
@@ -1008,6 +1027,46 @@ def home():
                          single_bookings=single_bookings,
                          asa_bookings=asa_bookings,
                          today=today)
+
+@app.route('/admin')
+@admin_required
+def admin_dashboard():
+    # Get all swimming school bookings
+    swimming_school_bookings = Booking.query.join(User).order_by(Booking.session_date.desc()).all()
+    
+    # Get all ASA club bookings
+    asa_bookings = ASABooking.query.join(User).order_by(ASABooking.booking_date.desc()).all()
+    
+    # Get quota information
+    locations = Location.query.all()
+    asa_schedules = ASASchedule.query.all()
+    
+    return render_template('admin/dashboard.html',
+                         swimming_school_bookings=swimming_school_bookings,
+                         asa_bookings=asa_bookings,
+                         locations=locations,
+                         asa_schedules=asa_schedules)
+
+@app.cli.command("create-admin")
+def create_admin():
+    """Create an admin user."""
+    username = input("Enter admin username: ")
+    email = input("Enter admin email: ")
+    password = input("Enter admin password: ")
+    
+    try:
+        admin = User(
+            username=username,
+            email=email,
+            password_hash=generate_password_hash(password),
+            is_admin=True
+        )
+        db.session.add(admin)
+        db.session.commit()
+        print("Admin user created successfully!")
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error creating admin user: {str(e)}")
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5001)
