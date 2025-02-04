@@ -44,7 +44,7 @@
                                 <div class="schedule-info">
                                     {% for quota in location.quotas %}
                                     <div class="schedule-item">
-                                        <span class="day">{{ quota.day_name }}</span>
+                                        <span class="day">{{ translate_day(quota.day_name) }}</span>
                                         <span class="time">{{ quota.start_time.strftime('%H:%M') }}</span>
                                     </div>
                                     {% endfor %}

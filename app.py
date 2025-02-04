@@ -14,6 +14,22 @@ app.secret_key = 'your-secret-key-here'  # Change this to a secure secret key
 db = SQLAlchemy(app)
 migrate = Migrate(app, db)
 
+# Add the translate_day function and register it BEFORE any routes
+def translate_day(day_name):
+    translations = {
+        'Monday': 'Senin',
+        'Tuesday': 'Selasa',
+        'Wednesday': 'Rabu',
+        'Thursday': 'Kamis',
+        'Friday': 'Jumat',
+        'Saturday': 'Sabtu',
+        'Sunday': 'Minggu'
+    }
+    return translations.get(day_name, day_name)
+
+# Register the filter right after the function definition
+app.jinja_env.filters['translate_day'] = translate_day
+
 # Models
 class Location(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -111,13 +127,15 @@ def login_required(f):
 @app.route('/')
 def index():
     locations = Location.query.all()
-    return render_template('dashboard.html', locations=locations)
+    return render_template('dashboard.html', locations=locations, translate_day=translate_day)
 
 @app.route('/dashboard')
 @login_required
 def dashboard():
     locations = Location.query.all()
-    return render_template('dashboard.html', locations=locations)
+    return render_template('dashboard.html', 
+                         locations=locations, 
+                         translate_day=translate_day)  # Pass the function here
 
 @app.route('/get_available_slots', methods=['POST'])
 @login_required
