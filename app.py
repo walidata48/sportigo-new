@@ -125,6 +125,7 @@ def get_available_slots():
     location_id = request.form.get('location_id')
     selected_date = datetime.strptime(request.form.get('date'), '%Y-%m-%d')
     day_name = calendar.day_name[selected_date.weekday()]
+    print(day_name)
 
     # Get quotas for the selected location and day
     quotas = Quota.query.filter_by(
@@ -468,12 +469,12 @@ def update_payment_status():
         first_booking = Booking.query.get_or_404(booking_id)
         
         # Apply coupon if provided
-        discount_percentage = 0
+        discount_amount = 0
         if coupon_code:
             coupon = Coupon.query.filter_by(code=coupon_code, is_active=True).first()
             if coupon and (not coupon.valid_until or coupon.valid_until >= datetime.now().date()):
-                discount_percentage = coupon.discount_percentage
-        
+                discount_amount = coupon.discount_amount
+        print(discount_amount)
         # Update payment status for all bookings with the same group_id
         bookings = Booking.query.filter_by(
             group_id=first_booking.group_id,
@@ -482,7 +483,7 @@ def update_payment_status():
         
         for booking in bookings:
             booking.payment_status = 'paid'
-            booking.applied_discount = discount_percentage  # You might want to add this field to the Booking model
+            booking.applied_discount = discount_amount
         
         db.session.commit()
         return jsonify({'success': True, 'message': 'Payment status updated successfully'})
@@ -533,8 +534,8 @@ def apply_coupon():
     
     return jsonify({
         'success': True,
-        'discount_percentage': coupon.discount_percentage,
-        'message': f'Kupon berhasil diterapkan! Diskon {coupon.discount_percentage}%'
+        'discount_amount': coupon.discount_amount,
+        'message': f'Kupon berhasil diterapkan! Diskon Rp {coupon.discount_amount:,}'
     })
 
 @app.route('/my_schedules')

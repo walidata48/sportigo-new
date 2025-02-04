@@ -153,8 +153,8 @@ function applyCoupon() {
         const messageElement = document.getElementById('couponMessage');
         if (data.success) {
             messageElement.className = 'small mt-1 text-success';
-            messageElement.textContent = `Kupon berhasil diterapkan! Diskon ${data.discount_percentage}%`;
-            appliedCouponDiscount = data.discount_percentage;
+            messageElement.textContent = `Kupon berhasil diterapkan! Diskon Rp ${data.discount_amount.toLocaleString('id-ID')}`;
+            appliedCouponDiscount = data.discount_amount;
             updateTotalPrice();
         } else {
             messageElement.className = 'small mt-1 text-danger';
@@ -166,8 +166,7 @@ function applyCoupon() {
 }
 
 function updateTotalPrice() {
-    const discountAmount = (originalPrice * appliedCouponDiscount) / 100;
-    const finalPrice = originalPrice - discountAmount;
+    const finalPrice = originalPrice - appliedCouponDiscount;
     document.getElementById('totalPayment').textContent = 
         'Rp ' + finalPrice.toLocaleString('id-ID');
 }
