@@ -10,9 +10,12 @@
         
         <div class="pricing-grid">
             {% for package in packages %}
-            <div class="pricing-card {% if package.is_morning_available %}popular{% endif %}">
+            <div class="pricing-card {% if package.is_morning_available %}popular{% endif %} {% if package.is_trial %}trial{% endif %}">
                 {% if package.is_morning_available %}
                 <div class="popular-badge">Premium</div>
+                {% endif %}
+                {% if package.is_trial %}
+                <div class="trial-badge">Trial</div>
                 {% endif %}
                 
                 <div class="pricing-header">
@@ -41,8 +44,12 @@
 
                 <div class="pricing-footer">
                     <form action="{{ url_for('asa_book', package_id=package.id) }}" method="POST">
-                        <button type="submit" class="btn-choose {% if package.is_morning_available %}popular{% endif %}">
+                        <button type="submit" class="btn-choose {% if package.is_morning_available %}popular{% endif %} {% if package.is_trial %}trial{% endif %}">
+                            {% if package.is_trial %}
+                            Book Trial
+                            {% else %}
                             Select Package
+                            {% endif %}
                         </button>
                     </form>
                 </div>
@@ -192,6 +199,30 @@
     padding: 15px;
     border-radius: 10px;
     border: 1px solid #dee2e6;
+}
+
+.trial-badge {
+    position: absolute;
+    top: 0;
+    right: 0;
+    background: #ff6b6b;
+    color: white;
+    padding: 8px 16px;
+    border-radius: 0 15px 0 15px;
+    font-weight: bold;
+}
+
+.pricing-card.trial {
+    border: 2px solid #ff6b6b;
+}
+
+.btn-choose.trial {
+    background: #ff6b6b;
+    color: white;
+}
+
+.btn-choose.trial:hover {
+    background: #ff5252;
 }
 </style>
 {% endblock %}

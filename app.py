@@ -83,6 +83,7 @@ class ASAPool(db.Model):
     description = db.Column(db.Text, nullable=True)
     is_morning_available = db.Column(db.Boolean, default=False)  # For "Reguler + Pagi"
     sessions_per_month = db.Column(db.Integer, default=12)  # Both packages have 12 sessions
+    is_trial = db.Column(db.Boolean, default=False)  # Add this line
 
 class ASASchedule(db.Model):
     __tablename__ = 'asa_schedules'
@@ -815,7 +816,16 @@ def initialize_asa_data():
         sessions_per_month=12
     )
 
-    db.session.add_all([regular_package, morning_package])
+    trial_package = ASAPool(
+        package_name='Trial',
+        price=90000,
+        description='1x Trial Session',
+        is_morning_available=False,
+        sessions_per_month=1,
+        is_trial=True
+    )
+
+    db.session.add_all([regular_package, morning_package, trial_package])
     db.session.flush()
 
     # Create schedules
@@ -849,6 +859,21 @@ def initialize_asa_data():
     for day, start, end in morning_schedules:
         schedules.append(ASASchedule(
             package_id=morning_package.id,
+            day_name=day,
+            start_time=datetime.strptime(start, '%H:%M').time(),
+            end_time=datetime.strptime(end, '%H:%M').time()
+        ))
+
+    # Trial package schedules (same as regular afternoon schedule)
+    trial_schedules = [
+        ('SELASA', '16:00', '17:30'),
+        ('KAMIS', '16:00', '17:30'),
+        ('SABTU', '16:00', '17:30')
+    ]
+
+    for day, start, end in trial_schedules:
+        schedules.append(ASASchedule(
+            package_id=trial_package.id,
             day_name=day,
             start_time=datetime.strptime(start, '%H:%M').time(),
             end_time=datetime.strptime(end, '%H:%M').time()
