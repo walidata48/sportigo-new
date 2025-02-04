@@ -8,6 +8,9 @@
         <!-- Swimming Club Section -->
         <div class="category-section mb-5">
             <div class="section-header text-center mb-4">
+                <div class="program-icon mx-auto mb-3">
+                    <i class="fas fa-swimming-pool"></i>
+                </div>
                 <h3 class="category-title">Swimming Club</h3>
                 <p class="category-description">Pengalaman berlatih yang lebih intensif</p>
             </div>
@@ -15,14 +18,8 @@
                 <!-- ASA Club Card -->
                 <div class="col-md-5">
                     <div class="program-card">
-                        <div class="program-header">
-                            <div class="program-icon">
-                                <i class="fas fa-swimming-pool"></i>
-                            </div>
-                            <h4>ASA Club</h4>
-                        </div>
                         <div class="pool-card">
-                            <h5><i class="far fa-calendar-alt me-2"></i>Regular Package</h5>
+                            <h5>ASA Club</h5>
                             <div class="pool-details">
                                 <div class="schedule-info">
                                     {% for schedule in asa_regular_schedules %}
@@ -43,17 +40,14 @@
                 <!-- KCC Club Card -->
                 <div class="col-md-5">
                     <div class="program-card coming-soon">
-                        <div class="program-header">
-                            <div class="program-icon">
-                                <i class="fas fa-star"></i>
+                        <div class="pool-card">
+                            <h5>KCC Club</h5>
+                            <div class="coming-soon-content">
+                                <i class="fas fa-clock coming-soon-icon"></i>
+                                <p class="coming-soon-text">Segera Hadir</p>
                             </div>
-                            <h4>KCC Club</h4>
                         </div>
-                        <div class="coming-soon-content">
-                            <i class="fas fa-clock coming-soon-icon"></i>
-                            <p class="coming-soon-text">Segera Hadir</p>
-                        </div>
-                        <button class="btn btn-secondary w-100" disabled>
+                        <button class="btn btn-secondary w-100 mt-4" disabled>
                             <i class="fas fa-hourglass-half me-2"></i>Segera Hadir
                         </button>
                     </div>
@@ -64,18 +58,14 @@
         <!-- Swimming School Section -->
         <div class="category-section mb-5">
             <div class="section-header text-center mb-4">
-                
+                <div class="program-icon mx-auto mb-3">
+                    <i class="fas fa-graduation-cap"></i>
+                </div>
                 <h3 class="category-title">Swimming School Program</h3>
-                <p class="category-description">Program renang dengan jadwal fleksibel</p>
+                <p class="category-description">Program jadwal fleksibel</p>
             </div>
             <div class="col-md-10 mx-auto">
                 <div class="program-card">
-                    <div class="program-header">
-                        <div class="program-icon">
-                            <i class="fas fa-graduation-cap"></i>
-                        </div>
-                        <h4>Swimming School Program</h4>
-                    </div>
                     <div class="pools-container">
                         {% for location in locations %}
                         <div class="pool-card">
@@ -103,17 +93,14 @@
         <!-- Private Section -->
         <div class="category-section">
             <div class="section-header text-center mb-4">
+                <div class="program-icon mx-auto mb-3">
+                    <i class="fas fa-user-graduate"></i>
+                </div>
                 <h3 class="category-title">Private</h3>
                 <p class="category-description">Pembelajaran renang privat dengan perhatian khusus untuk hasil maksimal</p>
             </div>
             <div class="col-md-10 mx-auto">
                 <div class="program-card coming-soon">
-                    <div class="program-header">
-                        <div class="program-icon">
-                            <i class="fas fa-user-graduate"></i>
-                        </div>
-                        <h4>Private Lesson</h4>
-                    </div>
                     <div class="location-info">
                         <i class="fas fa-map-marked-alt me-2"></i>
                         <span>Lokasi: Semua Pool</span>
@@ -190,10 +177,10 @@
 }
 
 .program-icon {
-    width: 50px;
-    height: 50px;
+    width: 80px;
+    height: 80px;
     background: linear-gradient(135deg, #007bff, #0056b3);
-    border-radius: 12px;
+    border-radius: 20px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -201,7 +188,7 @@
 
 .program-icon i {
     color: white;
-    font-size: 1.5rem;
+    font-size: 2.5rem;
 }
 
 .program-card h4 {
