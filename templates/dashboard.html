@@ -13,7 +13,16 @@
                 <div class="col-md-5">
                     <div class="program-card">
                         <h4>ASA Club</h4>
-                        
+                        <div class="pool-details">
+                            <div class="schedule-info">
+                                {% for schedule in asa_regular_schedules %}
+                                <div class="schedule-item">
+                                    <span class="day">{{ translate_day(schedule.day_name) }}</span>
+                                    <span class="time">{{ schedule.start_time.strftime('%H:%M') }}</span>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
                         <a href="{{ url_for('asa_packages') }}" class="btn btn-primary w-100">Pilih Paket</a>
                     </div>
                 </div>

@@ -132,15 +132,38 @@ def login_required(f):
 @app.route('/')
 def index():
     locations = Location.query.all()
-    return render_template('dashboard.html', locations=locations, translate_day=translate_day)
+    
+    # Get regular package schedules
+    regular_package = ASAPool.query.filter_by(package_name='Reguler').first()
+    asa_regular_schedules = []
+    if regular_package:
+        asa_regular_schedules = ASASchedule.query.filter_by(package_id=regular_package.id).all()
+    asa_regular_schedules = [
+    {field.name: getattr(schedule, field.name).title() if isinstance(getattr(schedule, field.name), str) else getattr(schedule, field.name) 
+     for field in ASASchedule.__table__.columns} 
+    for schedule in asa_regular_schedules
+    ]
+    return render_template('dashboard.html', 
+                         locations=locations, 
+                         translate_day=translate_day,
+                         asa_regular_schedules=asa_regular_schedules)
 
 @app.route('/dashboard')
 @login_required
 def dashboard():
     locations = Location.query.all()
+    
+    # Get regular package schedules
+    regular_package = ASAPool.query.filter_by(package_name='Reguler').first()
+    asa_regular_schedules = []
+    if regular_package:
+        asa_regular_schedules = ASASchedule.query.filter_by(package_id=regular_package.id).all()
+
+    
     return render_template('dashboard.html', 
                          locations=locations, 
-                         translate_day=translate_day)  # Pass the function here
+                         translate_day=translate_day,
+                         asa_regular_schedules=asa_regular_schedules)
 
 @app.route('/get_available_slots', methods=['POST'])
 @login_required
