@@ -1180,40 +1180,47 @@ def update_schedule():
     try:
         booking_id = request.form.get('booking_id')
         new_date = request.form.get('new_date')
-        new_location_id = request.form.get('new_location_id')
+        new_time = request.form.get('new_time')  # Get the new time slot
         update_all = request.form.get('update_all') == 'true'
         
-        if not booking_id or not new_date:
+        if not all([booking_id, new_date, new_time]):
             return jsonify({
                 'success': False,
-                'message': 'Missing required fields'
+                'message': 'Missing required information'
             })
-        
+
+        # Get the booking
         booking = Booking.query.get_or_404(booking_id)
         
-        # Update the booking date
+        # Parse the new time slot (format: "HH:MM - HH:MM")
+        start_time_str, end_time_str = new_time.split(' - ')
+        new_start_time = datetime.strptime(start_time_str, '%H:%M').time()
+        new_end_time = datetime.strptime(end_time_str, '%H:%M').time()
+        
+        # Update the booking with new date and time
         booking.session_date = datetime.strptime(new_date, '%Y-%m-%d').date()
-        
-        # Update location if provided
-        if new_location_id:
-            booking.location_id = new_location_id
-        
+        booking.start_time = new_start_time
+        booking.end_time = new_end_time
+
         # If it's a package booking and update_all is checked
         if update_all and booking.group_id:
-            # Calculate the difference in days
-            days_difference = (booking.session_date - booking.session_date).days
-            
-            # Update all future bookings in the package
+            # Get all future bookings in the package
             future_bookings = Booking.query.filter(
                 Booking.group_id == booking.group_id,
-                Booking.session_date >= booking.session_date
+                Booking.session_date >= booking.session_date,
+                Booking.id != booking.id  # Exclude the current booking
             ).all()
             
+            # Calculate the difference in days
+            original_date = booking.session_date
+            days_difference = (datetime.strptime(new_date, '%Y-%m-%d').date() - original_date).days
+            
+            # Update all future bookings
             for future_booking in future_bookings:
                 future_booking.session_date += timedelta(days=days_difference)
-                if new_location_id:
-                    future_booking.location_id = new_location_id
-        
+                future_booking.start_time = new_start_time
+                future_booking.end_time = new_end_time
+
         db.session.commit()
         
         return jsonify({
@@ -1223,9 +1230,10 @@ def update_schedule():
         
     except Exception as e:
         db.session.rollback()
+        print(f"Error updating schedule: {str(e)}")  # For debugging
         return jsonify({
             'success': False,
-            'message': str(e)
+            'message': f'Error updating schedule: {str(e)}'
         })
 
 @app.route('/check_quota_availability', methods=['POST'])
@@ -1303,13 +1311,17 @@ def check_quota_availability():
 def get_available_times():
     try:
         date = request.form.get('date')
-        location_id = request.form.get('location_id')
+        booking_id = request.form.get('booking_id')
         
-        if not date:
+        if not date or not booking_id:
             return jsonify({
                 'success': False,
-                'message': 'Date is required'
+                'message': 'Date and booking ID are required'
             })
+        
+        # Get the booking to get its location
+        booking = Booking.query.get_or_404(booking_id)
+        location_id = booking.location_id
             
         # Convert date to day name
         day_name = datetime.strptime(date, '%Y-%m-%d').strftime('%A')
@@ -1317,7 +1329,7 @@ def get_available_times():
         # Get all quotas for this day and location
         quotas = Quota.query.filter_by(
             day_name=day_name,
-            location_id=location_id or None
+            location_id=location_id
         ).all()
         
         time_slots = []

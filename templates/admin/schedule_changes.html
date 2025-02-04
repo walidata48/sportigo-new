@@ -60,8 +60,7 @@
                                                         data-bs-target="#scheduleChangeModal"
                                                         data-booking-id="{{ booking.id }}"
                                                         data-is-package="{{ 'true' if booking.group_id else 'false' }}"
-                                                        data-start-time="{{ booking.start_time.strftime('%H:%M') }}"
-                                                        data-end-time="{{ booking.end_time.strftime('%H:%M') }}">
+                                                        data-location-id="{{ booking.location_id }}">
                                                     Change Schedule
                                                 </button>
                                             </td>
@@ -110,8 +109,7 @@
                                                 data-bs-target="#scheduleChangeModal"
                                                 data-booking-id="{{ booking.id }}"
                                                 data-is-package="{{ 'true' if booking.group_id else 'false' }}"
-                                                data-start-time="{{ booking.start_time.strftime('%H:%M') }}"
-                                                data-end-time="{{ booking.end_time.strftime('%H:%M') }}">
+                                                data-location-id="{{ booking.location_id }}">
                                             Change Schedule
                                         </button>
                                     </td>
@@ -138,26 +136,17 @@
             <div class="modal-body">
                 <form id="scheduleChangeForm">
                     <input type="hidden" id="bookingId" name="booking_id">
+                    <input type="hidden" id="locationId" name="location_id">
                     
                     <div class="mb-3">
                         <label for="newDate" class="form-label">New Date</label>
                         <input type="date" class="form-control" id="newDate" name="new_date" required>
                     </div>
-                    
-                    <div class="mb-3">
-                        <label for="newLocation" class="form-label">New Location (Optional)</label>
-                        <select class="form-control" id="newLocation" name="location_id">
-                            <option value="">Keep current location</option>
-                            {% for location in locations %}
-                                <option value="{{ location.id }}">{{ location.name }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
 
                     <div class="mb-3">
                         <label for="newTime" class="form-label">New Time Slot</label>
                         <select class="form-control" id="newTime" name="new_time" required disabled>
-                            <option value="">Select date and location first</option>
+                            <option value="">Select date first</option>
                         </select>
                         <div id="quotaFeedback" class="form-text"></div>
                     </div>
@@ -186,7 +175,6 @@
 document.addEventListener('DOMContentLoaded', function() {
     const scheduleModal = document.getElementById('scheduleChangeModal');
     const dateInput = document.getElementById('newDate');
-    const locationSelect = document.getElementById('newLocation');
     const timeSelect = document.getElementById('newTime');
     const saveButton = document.getElementById('saveChangesBtn');
     
@@ -195,16 +183,16 @@ document.addEventListener('DOMContentLoaded', function() {
     
     function updateTimeSlots() {
         const date = dateInput.value;
-        const locationId = locationSelect.value;
+        const bookingId = document.getElementById('bookingId').value;
         
-        if (!date) return;
+        if (!date || !bookingId) return;
         
         timeSelect.disabled = true;
         timeSelect.innerHTML = '<option value="">Loading time slots...</option>';
         
         const formData = new FormData();
         formData.append('date', date);
-        formData.append('location_id', locationId);
+        formData.append('booking_id', bookingId);
         
         fetch('/get_available_times', {
             method: 'POST',
@@ -232,9 +220,8 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
-    // Event listeners for date and location changes
+    // Event listener for date change
     dateInput.addEventListener('change', updateTimeSlots);
-    locationSelect.addEventListener('change', updateTimeSlots);
     
     // Time slot change handler
     timeSelect.addEventListener('change', function() {
@@ -272,14 +259,16 @@ document.addEventListener('DOMContentLoaded', function() {
         const button = event.relatedTarget;
         const bookingId = button.getAttribute('data-booking-id');
         const isPackage = button.getAttribute('data-is-package') === 'true';
+        const locationId = button.getAttribute('data-location-id');
         
         // Reset form
         document.getElementById('scheduleChangeForm').reset();
         document.getElementById('bookingId').value = bookingId;
+        document.getElementById('locationId').value = locationId;
         document.getElementById('updateAllContainer').style.display = isPackage ? 'block' : 'none';
         document.getElementById('quotaFeedback').textContent = '';
         timeSelect.disabled = true;
-        timeSelect.innerHTML = '<option value="">Select date and location first</option>';
+        timeSelect.innerHTML = '<option value="">Select date first</option>';
         saveButton.disabled = true;
     });
     
