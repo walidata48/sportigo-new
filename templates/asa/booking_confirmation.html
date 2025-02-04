@@ -45,6 +45,22 @@
                                    value="{{ datetime.now().strftime('%Y-%m-%d') }}"
                                    required>
                         </div>
+                        
+                        <!-- Add coupon input section -->
+                        <div class="mb-3">
+                            <label for="coupon_code" class="form-label">Have a coupon?</label>
+                            <div class="input-group">
+                                <input type="text" 
+                                       class="form-control" 
+                                       id="coupon_code" 
+                                       placeholder="Enter coupon code">
+                                <button class="btn btn-outline-secondary" 
+                                        type="button" 
+                                        onclick="applyCoupon()">Apply</button>
+                            </div>
+                            <div id="couponMessage" class="form-text"></div>
+                        </div>
+                        
                         <button type="button" 
                                 class="btn btn-success btn-lg w-100 mb-3"
                                 data-bs-toggle="modal" 
@@ -65,7 +81,13 @@
                                 <div class="modal-body">
                                     <p>Are you sure you want to proceed with the payment?</p>
                                     <p>Start Date: <span id="confirmStartDate" class="fw-bold"></span></p>
-                                    <p class="fw-bold">Amount: Rp {{ "{:,}".format(package.price - (booking.applied_discount or 0)) }}</p>
+                                    <div class="price-breakdown">
+                                        <p>Original Price: <span class="fw-bold">Rp {{ "{:,}".format(package.price) }}</span></p>
+                                        <p id="discountRow" style="display: none;" class="text-success">
+                                            Discount: <span id="discountAmount" class="fw-bold"></span>
+                                        </p>
+                                        <p class="fw-bold">Final Price: <span id="finalPrice">Rp {{ "{:,}".format(package.price) }}</span></p>
+                                    </div>
                                 </div>
                                 <div class="modal-footer">
                                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
@@ -87,6 +109,63 @@
                         return date.toLocaleDateString('id-ID', options);
                     }
 
+                    let appliedDiscount = 0;
+
+                    function applyCoupon() {
+                        const couponCode = document.getElementById('coupon_code').value;
+                        if (!couponCode) {
+                            alert('Please enter a coupon code');
+                            return;
+                        }
+
+                        fetch('{{ url_for("apply_asa_coupon") }}', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/x-www-form-urlencoded',
+                            },
+                            body: new URLSearchParams({
+                                'coupon_code': couponCode,
+                                'package_price': '{{ package.price }}'
+                            })
+                        })
+                        .then(response => response.json())
+                        .then(data => {
+                            const messageDiv = document.getElementById('couponMessage');
+                            if (data.success) {
+                                messageDiv.className = 'form-text text-success';
+                                appliedDiscount = data.discount_amount;
+                                updatePriceDisplay();
+                            } else {
+                                messageDiv.className = 'form-text text-danger';
+                                appliedDiscount = 0;
+                                updatePriceDisplay();
+                            }
+                            messageDiv.textContent = data.message;
+                        })
+                        .catch(error => {
+                            console.error('Error:', error);
+                            alert('An error occurred while applying the coupon');
+                        });
+                    }
+
+                    function updatePriceDisplay() {
+                        const originalPrice = {{ package.price }};
+                        const finalPrice = originalPrice - appliedDiscount;
+                        
+                        const discountRow = document.getElementById('discountRow');
+                        const discountAmount = document.getElementById('discountAmount');
+                        const finalPriceElement = document.getElementById('finalPrice');
+                        
+                        if (appliedDiscount > 0) {
+                            discountRow.style.display = 'block';
+                            discountAmount.textContent = `- Rp ${appliedDiscount.toLocaleString('id-ID')}`;
+                        } else {
+                            discountRow.style.display = 'none';
+                        }
+                        
+                        finalPriceElement.textContent = `Rp ${finalPrice.toLocaleString('id-ID')}`;
+                    }
+
                     function showPaymentModal() {
                         const startDate = document.getElementById('start_date').value;
                         if (!startDate) {
@@ -98,6 +177,8 @@
                         document.getElementById('confirmStartDate').textContent = formatDate(startDate);
                         // Set the date value in the hidden form field
                         document.getElementById('form_start_date').value = startDate;
+                        // Update the form's applied discount
+                        document.querySelector('input[name="applied_discount"]').value = appliedDiscount;
                     }
                     </script>
                     {% else %}

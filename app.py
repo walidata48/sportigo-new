@@ -637,6 +637,7 @@ def update_asa_payment_status():
     try:
         booking_id = request.form.get('booking_id')
         start_date_str = request.form.get('start_date')
+        applied_discount = request.form.get('applied_discount', type=int) or 0
         
         if not start_date_str:
             flash('Please select a start date', 'error')
@@ -645,10 +646,11 @@ def update_asa_payment_status():
         booking = ASABooking.query.get_or_404(booking_id)
         package = ASAPool.query.get(booking.package_id)
         
-        # Parse start date
-        start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
+        # Update booking with discount
+        booking.applied_discount = applied_discount
         
         # Calculate end date (30 days from start date)
+        start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
         end_date = start_date + timedelta(days=29)  # 30 days period
         
         # Update booking status
