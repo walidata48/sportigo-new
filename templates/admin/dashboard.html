@@ -24,75 +24,130 @@
         <div class="tab-pane fade show active" id="swimming-school" role="tabpanel">
             <div class="card">
                 <div class="card-header">
-                    <h3 class="card-title mb-0">Swimming School Bookings</h3>
+                    <h3 class="card-title mb-3">Swimming School Bookings</h3>
+                    <!-- Filters Section -->
+                    <div class="filters-section row g-3 align-items-end">
+                        <div class="col-md-3">
+                            <label class="form-label">Date</label>
+                            <input type="date" id="bookingDate" class="form-control" 
+                                   value="{{ selected_date.strftime('%Y-%m-%d') }}">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Location</label>
+                            <select id="locationFilter" class="form-select">
+                                <option value="">All Locations</option>
+                                {% for location in locations %}
+                                <option value="{{ location.id }}" 
+                                        {% if selected_location == location.id %}selected{% endif %}>
+                                    {{ location.name }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Time</label>
+                            <select id="timeFilter" class="form-select">
+                                <option value="">All Times</option>
+                                {% for time in available_times %}
+                                <option value="{{ time }}"
+                                        {% if selected_time == time %}selected{% endif %}>
+                                    {{ time }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <button class="btn btn-primary w-100" onclick="applyFilters()">
+                                <i class="fas fa-filter me-2"></i>Apply Filters
+                            </button>
+                        </div>
+                    </div>
                 </div>
                 <div class="card-body">
                     <!-- Location Quotas -->
                     <div class="mb-4">
-                        <h4>Location Quotas</h4>
+                        <h4>Today's Quotas</h4>
                         <div class="table-responsive">
                             <table class="table table-bordered">
                                 <thead>
                                     <tr>
-                                        <th>Location</th>
-                                        <th>Day</th>
+                                        
                                         <th>Time</th>
                                         <th>Total Quota</th>
-                                        <th>Available Quota</th>
+                                        <th>Booked</th>
+                                        <th>Available</th>
                                     </tr>
                                 </thead>
-                                <tbody>
+                                <tbody id="quotasTableBody">
                                     {% for location in locations %}
-                                        {% for quota in location.quotas %}
-                                        <tr>
-                                            <td>{{ location.name }}</td>
-                                            <td>{{ quota.day_name | translate_day }}</td>
-                                            <td>{{ quota.start_time.strftime('%H:%M') }} - {{ quota.end_time.strftime('%H:%M') }}</td>
-                                            <td>{{ quota.quota or 0 }}</td>
-                                            <td>
-                                                {% set booked = namespace(count=0) %}
-                                                {% for booking in swimming_school_bookings %}
-                                                    {% if booking.location_id == location.id and 
-                                                        booking.start_time == quota.start_time and 
-                                                        booking.end_time == quota.end_time %}
-                                                        {% set booked.count = booked.count + 1 %}
-                                                    {% endif %}
-                                                {% endfor %}
-                                                {{ (quota.quota or 0) - booked.count }}
-                                            </td>
-                                        </tr>
-                                        {% endfor %}
+                                        {% if not selected_location or selected_location == location.id %}
+                                            {% for quota in location.quotas %}
+                                                {% if quota.day_name == selected_date.strftime('%A') %}
+                                                {% set time_str = quota.start_time.strftime('%H:%M') %}
+                                                {% if not selected_time or selected_time == time_str %}
+                                                <tr>
+                                                    
+                                                    <td>{{ time_str }} - {{ quota.end_time.strftime('%H:%M') }}</td>
+                                                    <td>{{ quota.quota }}</td>
+                                                    <td>
+                                                        {% set booked = bookings_count.get((location.id, time_str), 0) %}
+                                                        {{ booked }}
+                                                    </td>
+                                                    <td>{{ quota.quota - booked }}</td>
+                                                </tr>
+                                                {% endif %}
+                                                {% endif %}
+                                            {% endfor %}
+                                        {% endif %}
                                     {% endfor %}
                                 </tbody>
                             </table>
                         </div>
                     </div>
                     
-                    <!-- Bookings List -->
+                    <!-- Presence List -->
                     <div>
-                        <h4>Recent Bookings</h4>
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h4>Presence List</h4>
+                            <button class="btn btn-success" onclick="saveAllPresence()">
+                                <i class="fas fa-save me-2"></i>Save All Changes
+                            </button>
+                        </div>
                         <div class="table-responsive">
                             <table class="table table-striped">
                                 <thead>
                                     <tr>
-                                        <th>User</th>
-                                        <th>Location</th>
-                                        <th>Date</th>
                                         <th>Time</th>
+                                        
+                                        <th>User</th>
                                         <th>Status</th>
+                                        <th>Presence</th>
+                                        <th>Notes</th>
                                     </tr>
                                 </thead>
-                                <tbody>
-                                    {% for booking in swimming_school_bookings %}
-                                    <tr>
-                                        <td>{{ booking.user.username }}</td>
-                                        <td>{{ booking.location.name }}</td>
-                                        <td>{{ booking.session_date.strftime('%d %B %Y') }}</td>
+                                <tbody id="presenceTableBody">
+                                    {% for booking in daily_bookings %}
+                                    <tr data-booking-id="{{ booking.id }}" class="presence-row">
                                         <td>{{ booking.start_time.strftime('%H:%M') }} - {{ booking.end_time.strftime('%H:%M') }}</td>
+                                        
+                                        <td>{{ booking.user.username }}</td>
                                         <td>
                                             <span class="badge bg-{{ 'success' if booking.payment_status == 'paid' else 'warning' }}">
                                                 {{ booking.payment_status }}
                                             </span>
+                                        </td>
+                                        <td>
+                                            <select class="form-select presence-select" data-original-value="{{ booking.presence_status }}">
+                                                <option value="pending" {{ 'selected' if booking.presence_status == 'pending' }}>Pending</option>
+                                                <option value="present" {{ 'selected' if booking.presence_status == 'present' }}>Present</option>
+                                                <option value="absent" {{ 'selected' if booking.presence_status == 'absent' }}>Absent</option>
+                                            </select>
+                                        </td>
+                                        <td>
+                                            <input type="text" class="form-control notes-input" 
+                                                   value="{{ booking.notes or '' }}"
+                                                   data-original-value="{{ booking.notes or '' }}"
+                                                   placeholder="Add notes...">
                                         </td>
                                     </tr>
                                     {% endfor %}
@@ -239,5 +294,129 @@
     padding: 0.5em 1em;
     font-weight: 500;
 }
+
+.presence-select {
+    width: 100px;
+}
+
+.notes-input {
+    min-width: 200px;
+}
+
+.date-picker-wrapper {
+    width: 200px;
+}
+
+select.presence-select option[value="present"] {
+    background-color: #d4edda;
+}
+
+select.presence-select option[value="absent"] {
+    background-color: #f8d7da;
+}
+
+select.presence-select option[value="pending"] {
+    background-color: #fff3cd;
+}
+
+.filters-section {
+    background-color: #f8f9fa;
+    padding: 1rem;
+    border-radius: 10px;
+    margin-top: 1rem;
+}
+
+.presence-row.modified {
+    background-color: #fff3cd !important;
+}
+
+.btn-success {
+    background: linear-gradient(135deg, #28a745, #218838);
+    border: none;
+    box-shadow: 0 4px 15px rgba(40,167,69,0.3);
+}
+
+.btn-success:hover {
+    background: linear-gradient(135deg, #218838, #1e7e34);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(40,167,69,0.4);
+}
 </style>
+
+<script>
+function applyFilters() {
+    const date = document.getElementById('bookingDate').value;
+    const location = document.getElementById('locationFilter').value;
+    const time = document.getElementById('timeFilter').value;
+    
+    let url = "{{ url_for('admin_dashboard') }}?date=" + date;
+    if (location) url += "&location=" + location;
+    if (time) url += "&time=" + time;
+    
+    window.location.href = url;
+}
+
+// Track changes in presence and notes
+document.querySelectorAll('.presence-select, .notes-input').forEach(element => {
+    element.addEventListener('change', function() {
+        const row = this.closest('.presence-row');
+        const originalValue = this.dataset.originalValue;
+        const currentValue = this.value;
+        
+        if (originalValue !== currentValue) {
+            row.classList.add('modified');
+        } else {
+            // Check if other fields in the row are modified
+            const otherModified = row.querySelector('.presence-select, .notes-input').some(
+                el => el.dataset.originalValue !== el.value
+            );
+            if (!otherModified) {
+                row.classList.remove('modified');
+            }
+        }
+    });
+});
+
+function saveAllPresence() {
+    const modifiedRows = document.querySelectorAll('.presence-row.modified');
+    const updates = Array.from(modifiedRows).map(row => ({
+        booking_id: row.dataset.bookingId,
+        presence_status: row.querySelector('.presence-select').value,
+        notes: row.querySelector('.notes-input').value
+    }));
+    
+    if (updates.length === 0) {
+        alert('No changes to save');
+        return;
+    }
+    
+    fetch("{{ url_for('update_presence_batch') }}", {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ updates: updates })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Update original values and remove modified class
+            modifiedRows.forEach(row => {
+                row.querySelector('.presence-select').dataset.originalValue = 
+                    row.querySelector('.presence-select').value;
+                row.querySelector('.notes-input').dataset.originalValue = 
+                    row.querySelector('.notes-input').value;
+                row.classList.remove('modified');
+            });
+            alert('Changes saved successfully!');
+        } else {
+            alert('Error saving changes');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error saving changes');
+    });
+}
+</script>
 {% endblock %}

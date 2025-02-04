@@ -6,6 +6,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from functools import wraps
 from flask_migrate import Migrate
 from flask.cli import FlaskGroup
+from sqlalchemy import distinct
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://waliy:12345@localhost/swim'
@@ -55,6 +56,8 @@ class Booking(db.Model):
     end_time = db.Column(db.Time, nullable=False)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     payment_status = db.Column(db.String(20), default='pending')
+    presence_status = db.Column(db.String(20), default='pending')
+    notes = db.Column(db.Text, nullable=True)
     location = db.relationship('Location', backref='bookings', lazy=True)
 
 class User(db.Model):
@@ -1031,21 +1034,74 @@ def home():
 @app.route('/admin')
 @admin_required
 def admin_dashboard():
-    # Get all swimming school bookings
-    swimming_school_bookings = Booking.query.join(User).order_by(Booking.session_date.desc()).all()
-    
-    # Get all ASA club bookings
-    asa_bookings = ASABooking.query.join(User).order_by(ASABooking.booking_date.desc()).all()
-    
-    # Get quota information
-    locations = Location.query.all()
-    asa_schedules = ASASchedule.query.all()
-    
+    # Get filters from query params
+    selected_date = request.args.get('date')
+    selected_location = request.args.get('location', type=int)
+    selected_time = request.args.get('time')
+
+    if selected_date:
+        selected_date = datetime.strptime(selected_date, '%Y-%m-%d').date()
+    else:
+        selected_date = datetime.now().date()
+
+    # Base query
+    bookings_query = Booking.query.filter(Booking.session_date == selected_date)
+
+    # Apply filters
+    if selected_location:
+        bookings_query = bookings_query.filter(Booking.location_id == selected_location)
+    if selected_time:
+        bookings_query = bookings_query.filter(
+            Booking.start_time == datetime.strptime(selected_time, '%H:%M').time()
+        )
+
+    # Get filtered bookings
+    daily_bookings = bookings_query.order_by(
+        Booking.start_time,
+        Booking.location_id
+    ).all()
+
+    # Calculate bookings count
+    bookings_count = {}
+    for booking in daily_bookings:
+        key = (booking.location_id, booking.start_time.strftime('%H:%M'))
+        bookings_count[key] = bookings_count.get(key, 0) + 1
+
+    # Get available times for filter
+    available_times = db.session.query(distinct(Booking.start_time)).\
+        order_by(Booking.start_time).\
+        all()
+    available_times = [time[0].strftime('%H:%M') for time in available_times]
+
     return render_template('admin/dashboard.html',
-                         swimming_school_bookings=swimming_school_bookings,
-                         asa_bookings=asa_bookings,
-                         locations=locations,
-                         asa_schedules=asa_schedules)
+                         selected_date=selected_date,
+                         selected_location=selected_location,
+                         selected_time=selected_time,
+                         daily_bookings=daily_bookings,
+                         bookings_count=bookings_count,
+                         locations=Location.query.all(),
+                         available_times=available_times,
+                         asa_bookings=ASABooking.query.all(),
+                         asa_schedules=ASASchedule.query.all())
+
+@app.route('/update_presence_batch', methods=['POST'])
+@admin_required
+def update_presence_batch():
+    data = request.get_json()
+    updates = data.get('updates', [])
+    
+    try:
+        for update in updates:
+            booking = Booking.query.get(update['booking_id'])
+            if booking:
+                booking.presence_status = update['presence_status']
+                booking.notes = update['notes']
+        
+        db.session.commit()
+        return jsonify({'success': True})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)})
 
 @app.cli.command("create-admin")
 def create_admin():
