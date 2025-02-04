@@ -1124,5 +1124,220 @@ def create_admin():
         db.session.rollback()
         print(f"Error creating admin user: {str(e)}")
 
+@app.route('/admin/schedule_changes')
+@admin_required
+def admin_schedule_changes():
+    # Get username filter from query parameters
+    username_filter = request.args.get('username', '').strip()
+    
+    # Base query for all swimming school bookings
+    bookings_query = Booking.query
+    
+    # Apply username filter if provided
+    if username_filter:
+        bookings_query = bookings_query.join(User).filter(
+            User.username.ilike(f'%{username_filter}%')
+        )
+    else:
+        # If no filter, don't show any bookings
+        return render_template(
+            'admin/schedule_changes.html',
+            grouped_bookings={},
+            single_bookings=[],
+            locations=Location.query.all(),
+            username_filter=''
+        )
+    
+    # Get all bookings ordered by date
+    bookings = bookings_query.order_by(
+        Booking.session_date.desc(),
+        Booking.start_time
+    ).all()
+    
+    # Group bookings by group_id for package bookings
+    grouped_bookings = {}
+    single_bookings = []
+    
+    for booking in bookings:
+        if booking.group_id:
+            if booking.group_id not in grouped_bookings:
+                grouped_bookings[booking.group_id] = []
+            grouped_bookings[booking.group_id].append(booking)
+        else:
+            single_bookings.append(booking)
+    
+    return render_template(
+        'admin/schedule_changes.html',
+        grouped_bookings=grouped_bookings,
+        single_bookings=single_bookings,
+        locations=Location.query.all(),
+        username_filter=username_filter
+    )
+
+@app.route('/admin/update_schedule', methods=['POST'])
+@admin_required
+def update_schedule():
+    try:
+        booking_id = request.form.get('booking_id')
+        new_date = request.form.get('new_date')
+        new_location_id = request.form.get('new_location_id')
+        update_all = request.form.get('update_all') == 'true'
+        
+        if not booking_id or not new_date:
+            return jsonify({
+                'success': False,
+                'message': 'Missing required fields'
+            })
+        
+        booking = Booking.query.get_or_404(booking_id)
+        
+        # Update the booking date
+        booking.session_date = datetime.strptime(new_date, '%Y-%m-%d').date()
+        
+        # Update location if provided
+        if new_location_id:
+            booking.location_id = new_location_id
+        
+        # If it's a package booking and update_all is checked
+        if update_all and booking.group_id:
+            # Calculate the difference in days
+            days_difference = (booking.session_date - booking.session_date).days
+            
+            # Update all future bookings in the package
+            future_bookings = Booking.query.filter(
+                Booking.group_id == booking.group_id,
+                Booking.session_date >= booking.session_date
+            ).all()
+            
+            for future_booking in future_bookings:
+                future_booking.session_date += timedelta(days=days_difference)
+                if new_location_id:
+                    future_booking.location_id = new_location_id
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Schedule updated successfully'
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            'success': False,
+            'message': str(e)
+        })
+
+@app.route('/check_quota_availability', methods=['POST'])
+@admin_required
+def check_quota_availability():
+    try:
+        booking_id = request.form.get('booking_id')
+        new_date = request.form.get('new_date')
+        new_time = request.form.get('new_time')  # New parameter for time slot
+        location_id = request.form.get('location_id')
+        
+        if not all([booking_id, new_date, new_time]):
+            return jsonify({
+                'available': False,
+                'message': 'Missing required information'
+            })
+
+        # Get the booking and its details
+        booking = Booking.query.get_or_404(booking_id)
+        
+        # If no new location selected, use current location
+        if not location_id:
+            location_id = booking.location_id
+        
+        # Convert date string to datetime
+        selected_date = datetime.strptime(new_date, '%Y-%m-%d').date()
+        day_name = selected_date.strftime('%A')
+        
+        # Get time slot details
+        time_parts = new_time.split('-')
+        start_time = datetime.strptime(time_parts[0].strip(), '%H:%M').time()
+        end_time = datetime.strptime(time_parts[1].strip(), '%H:%M').time()
+        
+        # Get quota for the selected location, day and time slot
+        quota = Quota.query.filter_by(
+            location_id=location_id,
+            day_name=day_name,
+            start_time=start_time,
+            end_time=end_time
+        ).first()
+        
+        if not quota:
+            return jsonify({
+                'available': False,
+                'message': f'No schedule available for this time slot at the selected location'
+            })
+        
+        # Count existing bookings
+        existing_bookings = Booking.query.filter(
+            Booking.location_id == location_id,
+            Booking.session_date == selected_date,
+            Booking.start_time == start_time,
+            Booking.end_time == end_time,
+            Booking.id != booking_id  # Exclude current booking
+        ).count()
+        
+        available = existing_bookings < quota.quota
+        remaining_slots = quota.quota - existing_bookings
+        
+        return jsonify({
+            'available': available,
+            'remaining_slots': remaining_slots,
+            'message': f'Available slots: {remaining_slots}' if available else 'No slots available for this date and time'
+        })
+        
+    except Exception as e:
+        print(f"Error checking availability: {str(e)}")
+        return jsonify({
+            'available': False,
+            'message': f'Error checking availability: {str(e)}'
+        })
+
+@app.route('/get_available_times', methods=['POST'])
+@admin_required
+def get_available_times():
+    try:
+        date = request.form.get('date')
+        location_id = request.form.get('location_id')
+        
+        if not date:
+            return jsonify({
+                'success': False,
+                'message': 'Date is required'
+            })
+            
+        # Convert date to day name
+        day_name = datetime.strptime(date, '%Y-%m-%d').strftime('%A')
+        
+        # Get all quotas for this day and location
+        quotas = Quota.query.filter_by(
+            day_name=day_name,
+            location_id=location_id or None
+        ).all()
+        
+        time_slots = []
+        for quota in quotas:
+            time_slots.append({
+                'id': quota.id,
+                'time': f"{quota.start_time.strftime('%H:%M')} - {quota.end_time.strftime('%H:%M')}",
+                'quota': quota.quota
+            })
+        
+        return jsonify({
+            'success': True,
+            'time_slots': time_slots
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'message': str(e)
+        })
+
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5001)
