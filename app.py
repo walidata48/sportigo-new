@@ -70,6 +70,10 @@ class Coupon(db.Model):
     discount_amount = db.Column(db.Integer, nullable=False)  # Store as fixed amount (e.g., 50000)
     valid_until = db.Column(db.Date, nullable=True)
     is_active = db.Column(db.Boolean, default=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)  # NULL means coupon for all users
+    
+    # Add relationship to User model
+    user = db.relationship('User', backref='coupons')
 
 class ASAPool(db.Model):
     __tablename__ = 'asa_packages'
@@ -758,7 +762,15 @@ def apply_asa_coupon():
     coupon_code = request.form.get('coupon_code')
     package_price = request.form.get('package_price', type=int)
     
-    coupon = Coupon.query.filter_by(code=coupon_code, is_active=True).first()
+    # Query for either user-specific coupon or general coupon
+    coupon = Coupon.query.filter(
+        Coupon.code == coupon_code,
+        Coupon.is_active == True,
+        db.or_(
+            Coupon.user_id == session['user_id'],  # User-specific coupon
+            Coupon.user_id == None  # General coupon
+        )
+    ).first()
     
     if not coupon:
         return jsonify({
