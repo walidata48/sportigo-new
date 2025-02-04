@@ -1180,8 +1180,7 @@ def update_schedule():
     try:
         booking_id = request.form.get('booking_id')
         new_date = request.form.get('new_date')
-        new_time = request.form.get('new_time')  # Get the new time slot
-        update_all = request.form.get('update_all') == 'true'
+        new_time = request.form.get('new_time')
         
         if not all([booking_id, new_date, new_time]):
             return jsonify({
@@ -1202,25 +1201,6 @@ def update_schedule():
         booking.start_time = new_start_time
         booking.end_time = new_end_time
 
-        # If it's a package booking and update_all is checked
-        if update_all and booking.group_id:
-            # Get all future bookings in the package
-            future_bookings = Booking.query.filter(
-                Booking.group_id == booking.group_id,
-                Booking.session_date >= booking.session_date,
-                Booking.id != booking.id  # Exclude the current booking
-            ).all()
-            
-            # Calculate the difference in days
-            original_date = booking.session_date
-            days_difference = (datetime.strptime(new_date, '%Y-%m-%d').date() - original_date).days
-            
-            # Update all future bookings
-            for future_booking in future_bookings:
-                future_booking.session_date += timedelta(days=days_difference)
-                future_booking.start_time = new_start_time
-                future_booking.end_time = new_end_time
-
         db.session.commit()
         
         return jsonify({
@@ -1230,7 +1210,7 @@ def update_schedule():
         
     except Exception as e:
         db.session.rollback()
-        print(f"Error updating schedule: {str(e)}")  # For debugging
+        print(f"Error updating schedule: {str(e)}")
         return jsonify({
             'success': False,
             'message': f'Error updating schedule: {str(e)}'
@@ -1323,14 +1303,18 @@ def get_available_times():
         booking = Booking.query.get_or_404(booking_id)
         location_id = booking.location_id
             
-        # Convert date to day name
-        day_name = datetime.strptime(date, '%Y-%m-%d').strftime('%A')
+        # Convert date to day name (e.g., 'MONDAY', 'TUESDAY', etc.)
+        day_name = datetime.strptime(date, '%Y-%m-%d').strftime('%A').upper()
+        
+        print(f"Fetching quotas for: Location={location_id}, Day={day_name}")  # Debug print
         
         # Get all quotas for this day and location
         quotas = Quota.query.filter_by(
             day_name=day_name,
             location_id=location_id
         ).all()
+        
+        print(f"Found {len(quotas)} quotas")  # Debug print
         
         time_slots = []
         for quota in quotas:
@@ -1339,6 +1323,7 @@ def get_available_times():
                 'time': f"{quota.start_time.strftime('%H:%M')} - {quota.end_time.strftime('%H:%M')}",
                 'quota': quota.quota
             })
+            print(f"Added time slot: {quota.start_time} - {quota.end_time}")  # Debug print
         
         return jsonify({
             'success': True,
@@ -1346,6 +1331,7 @@ def get_available_times():
         })
         
     except Exception as e:
+        print(f"Error in get_available_times: {str(e)}")  # Debug print
         return jsonify({
             'success': False,
             'message': str(e)

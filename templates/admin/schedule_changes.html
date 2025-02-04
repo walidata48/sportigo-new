@@ -150,15 +150,6 @@
                         </select>
                         <div id="quotaFeedback" class="form-text"></div>
                     </div>
-                    
-                    <div class="mb-3" id="updateAllContainer" style="display: none;">
-                        <div class="form-check">
-                            <input type="checkbox" class="form-check-input" id="updateAll" name="update_all">
-                            <label class="form-check-label" for="updateAll">
-                                Update all future sessions in this package
-                            </label>
-                        </div>
-                    </div>
                 </form>
             </div>
             <div class="modal-footer">
@@ -265,7 +256,6 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('scheduleChangeForm').reset();
         document.getElementById('bookingId').value = bookingId;
         document.getElementById('locationId').value = locationId;
-        document.getElementById('updateAllContainer').style.display = isPackage ? 'block' : 'none';
         document.getElementById('quotaFeedback').textContent = '';
         timeSelect.disabled = true;
         timeSelect.innerHTML = '<option value="">Select date first</option>';
