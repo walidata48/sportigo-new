@@ -1478,5 +1478,80 @@ def payment_history():
         payment_history=payment_history
     )
 
+@app.route('/admin/coupons', methods=['GET', 'POST'])
+@admin_required
+def admin_coupons():
+    if request.method == 'POST':
+        try:
+            code = request.form.get('code')
+            discount_amount = request.form.get('discount_amount')
+            valid_until = request.form.get('valid_until')
+            user_id = request.form.get('user_id') or None  # None for general coupons
+            
+            # Basic validation
+            if not code or not discount_amount:
+                flash('Code and discount amount are required', 'error')
+                return redirect(url_for('admin_coupons'))
+            
+            # Check if coupon code already exists
+            if Coupon.query.filter_by(code=code).first():
+                flash('Coupon code already exists', 'error')
+                return redirect(url_for('admin_coupons'))
+            
+            # Create new coupon
+            coupon = Coupon(
+                code=code,
+                discount_amount=discount_amount,
+                valid_until=datetime.strptime(valid_until, '%Y-%m-%d').date() if valid_until else None,
+                user_id=user_id,
+                is_active=True
+            )
+            
+            db.session.add(coupon)
+            db.session.commit()
+            flash('Coupon created successfully', 'success')
+            return redirect(url_for('admin_coupons'))
+            
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error creating coupon: {str(e)}', 'error')
+            return redirect(url_for('admin_coupons'))
+    
+    # GET request - show coupons list
+    coupons = Coupon.query.order_by(Coupon.id.desc()).all()
+    users = User.query.order_by(User.username).all()  # For user-specific coupons
+    return render_template('admin/coupons.html', coupons=coupons, users=users)
+
+@app.route('/admin/coupons/toggle/<int:coupon_id>', methods=['POST'])
+@admin_required
+def toggle_coupon(coupon_id):
+    try:
+        coupon = Coupon.query.get_or_404(coupon_id)
+        coupon.is_active = not coupon.is_active
+        db.session.commit()
+        return jsonify({
+            'success': True,
+            'is_active': coupon.is_active
+        })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        })
+
+@app.route('/admin/coupons/delete/<int:coupon_id>', methods=['POST'])
+@admin_required
+def delete_coupon(coupon_id):
+    try:
+        coupon = Coupon.query.get_or_404(coupon_id)
+        db.session.delete(coupon)
+        db.session.commit()
+        flash('Coupon deleted successfully', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error deleting coupon: {str(e)}', 'error')
+    return redirect(url_for('admin_coupons'))
+
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5001)

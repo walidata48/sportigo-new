@@ -1,0 +1,144 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>Coupon Management</h2>
+    
+    <!-- Create Coupon Form -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h4>Create New Coupon</h4>
+        </div>
+        <div class="card-body">
+            <form method="POST">
+                <div class="row">
+                    <div class="col-md-3">
+                        <div class="form-group">
+                            <label for="code">Coupon Code*</label>
+                            <input type="text" class="form-control" id="code" name="code" required>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="form-group">
+                            <label for="discount_amount">Discount Amount (Rp)*</label>
+                            <input type="number" class="form-control" id="discount_amount" name="discount_amount" required>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="form-group">
+                            <label for="valid_until">Valid Until</label>
+                            <input type="date" class="form-control" id="valid_until" name="valid_until">
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="form-group">
+                            <label for="user_id">Specific User (Optional)</label>
+                            <select class="form-control" id="user_id" name="user_id">
+                                <option value="">General Coupon</option>
+                                {% for user in users %}
+                                <option value="{{ user.id }}">{{ user.username }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <button type="submit" class="btn btn-primary mt-3">Create Coupon</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Coupons List -->
+    <div class="card">
+        <div class="card-header">
+            <h4>Existing Coupons</h4>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>Code</th>
+                            <th>Discount</th>
+                            <th>Valid Until</th>
+                            <th>User</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for coupon in coupons %}
+                        <tr>
+                            <td>{{ coupon.code }}</td>
+                            <td>Rp {{ "{:,}".format(coupon.discount_amount) }}</td>
+                            <td>
+                                {% if coupon.valid_until %}
+                                    {{ coupon.valid_until.strftime('%d %B %Y') }}
+                                {% else %}
+                                    No expiry
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if coupon.user %}
+                                    {{ coupon.user.username }}
+                                {% else %}
+                                    General
+                                {% endif %}
+                            </td>
+                            <td>
+                                <div class="custom-control custom-switch">
+                                    <input type="checkbox" class="custom-control-input toggle-coupon" 
+                                           id="toggle{{ coupon.id }}" 
+                                           data-coupon-id="{{ coupon.id }}"
+                                           {% if coupon.is_active %}checked{% endif %}>
+                                    <label class="custom-control-label" for="toggle{{ coupon.id }}">
+                                        {% if coupon.is_active %}Active{% else %}Inactive{% endif %}
+                                    </label>
+                                </div>
+                            </td>
+                            <td>
+                                <form method="POST" action="{{ url_for('delete_coupon', coupon_id=coupon.id) }}" 
+                                      class="d-inline" onsubmit="return confirm('Are you sure you want to delete this coupon?')">
+                                    <button type="submit" class="btn btn-danger btn-sm">Delete</button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Handle toggle switches
+    document.querySelectorAll('.toggle-coupon').forEach(toggle => {
+        toggle.addEventListener('change', function() {
+            const couponId = this.dataset.couponId;
+            fetch(`/admin/coupons/toggle/${couponId}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (!data.success) {
+                    alert('Error updating coupon status');
+                    this.checked = !this.checked;
+                }
+                // Update label text
+                const label = this.nextElementSibling;
+                label.textContent = this.checked ? 'Active' : 'Inactive';
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Error updating coupon status');
+                this.checked = !this.checked;
+            });
+        });
+    });
+});
+</script>
+{% endblock %} 
