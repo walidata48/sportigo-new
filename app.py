@@ -11,11 +11,11 @@ from sqlalchemy import distinct
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://waliy:12345@localhost/swim'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.secret_key = 'your-secret-key-here'  # Change this to a secure secret key
+app.secret_key = 'your-secret-key-here'  
 db = SQLAlchemy(app)
 migrate = Migrate(app, db)
 
-# Add the translate_day function and register it BEFORE any routes
+
 def translate_day(day_name):
     translations = {
         'Monday': 'Senin',
@@ -28,15 +28,15 @@ def translate_day(day_name):
     }
     return translations.get(day_name, day_name)
 
-# Register the filter right after the function definition
+
 app.jinja_env.filters['translate_day'] = translate_day
 
 # Models
 class Location(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
-    monthly_price = db.Column(db.Integer, nullable=False)  # Price for 4 sessions package
-    daily_price = db.Column(db.Integer, nullable=False)    # Price for single session
+    monthly_price = db.Column(db.Integer, nullable=False)  
+    daily_price = db.Column(db.Integer, nullable=False)    
     quotas = db.relationship('Quota', backref='location', lazy=True)
 
 class Quota(db.Model):
