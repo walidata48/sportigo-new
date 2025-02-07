@@ -1,0 +1,184 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container py-5">
+    <h1 class="mb-4">ASA Swimming Club Attendance</h1>
+    
+    <!-- Add debug info -->
+    {% if not sessions %}
+    <div class="alert alert-info">
+        <h5>Debug Information:</h5>
+        <p>Selected Date: {{ selected_date }}</p>
+        
+        <p>No sessions found for this date.</p>
+    </div>
+    {% endif %}
+    
+    <div class="card">
+        <div class="card-header">
+            <div class="row g-3 align-items-end">
+                <div class="col-md-3">
+                    <label class="form-label">Date</label>
+                    <input type="date" id="attendanceDate" class="form-control" 
+                           value="{{ selected_date }}">
+                </div>
+                <div class="col-md-3">
+                    <button class="btn btn-primary w-100" onclick="applyDateFilter()">
+                        <i class="fas fa-filter me-2"></i>Apply Filter
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h4>Attendance List</h4>
+                <button class="btn btn-success" onclick="saveAllPresence()">
+                    <i class="fas fa-save me-2"></i>Save All Changes
+                </button>
+            </div>
+            
+            <div class="table-responsive">
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>Time</th>
+                            <th>Member</th>
+                            <th>Package</th>
+                            <th>Status</th>
+                            <th>Attendance</th>
+                            <th>Notes</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for session in sessions %}
+                        <tr data-session-id="{{ session.id }}" class="presence-row">
+                            <td>{{ session.start_time.strftime('%H:%M') }} - {{ session.end_time.strftime('%H:%M') }}</td>
+                            <td>{{ session.booking.user.username }}</td>
+                            <td>{{ session.booking.package.package_name }}</td>
+                            <td>
+                                <span class="badge bg-{{ 'success' if session.booking.payment_status == 'paid' else 'warning' }}">
+                                    {{ session.booking.payment_status }}
+                                </span>
+                            </td>
+                            <td>
+                                <select class="form-select presence-select" data-original-value="{{ session.status }}">
+                                    <option value="scheduled" {{ 'selected' if session.status == 'scheduled' }}>Pending</option>
+                                    <option value="completed" {{ 'selected' if session.status == 'completed' }}>Present</option>
+                                    <option value="cancelled" {{ 'selected' if session.status == 'cancelled' }}>Absent</option>
+                                </select>
+                            </td>
+                            <td>
+                                <input type="text" class="form-control notes-input" 
+                                       value="{{ session.notes or '' }}"
+                                       data-original-value="{{ session.notes or '' }}"
+                                       placeholder="Add notes...">
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+/* Reuse existing styles from admin dashboard */
+.card {
+    border: none;
+    box-shadow: 0 0 20px rgba(0,0,0,0.08);
+    border-radius: 15px;
+    margin-bottom: 2rem;
+}
+
+.card-header {
+    background-color: #f8f9fa;
+    border-bottom: 1px solid rgba(0,0,0,0.05);
+    padding: 1.5rem;
+    border-radius: 15px 15px 0 0;
+}
+
+.presence-row.modified {
+    background-color: #fff3cd !important;
+}
+
+.presence-select {
+    width: 120px;
+}
+
+.notes-input {
+    min-width: 200px;
+}
+</style>
+
+<script>
+function applyDateFilter() {
+    const date = document.getElementById('attendanceDate').value;
+    window.location.href = "{{ url_for('admin_asa_attendance') }}?date=" + date;
+}
+
+// Track changes in presence and notes
+document.querySelectorAll('.presence-select, .notes-input').forEach(element => {
+    element.addEventListener('change', function() {
+        const row = this.closest('.presence-row');
+        const originalValue = this.dataset.originalValue;
+        const currentValue = this.value;
+        
+        if (originalValue !== currentValue) {
+            row.classList.add('modified');
+        } else {
+            // Check if other fields in the row are modified
+            const otherModified = Array.from(row.querySelectorAll('.presence-select, .notes-input')).some(
+                el => el.dataset.originalValue !== el.value
+            );
+            if (!otherModified) {
+                row.classList.remove('modified');
+            }
+        }
+    });
+});
+
+function saveAllPresence() {
+    const modifiedRows = document.querySelectorAll('.presence-row.modified');
+    const updates = Array.from(modifiedRows).map(row => ({
+        session_id: row.dataset.sessionId,
+        status: row.querySelector('.presence-select').value,
+        notes: row.querySelector('.notes-input').value
+    }));
+    
+    if (updates.length === 0) {
+        alert('No changes to save');
+        return;
+    }
+    
+    fetch("{{ url_for('update_asa_presence_batch') }}", {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ updates: updates })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Update original values and remove modified class
+            modifiedRows.forEach(row => {
+                row.querySelector('.presence-select').dataset.originalValue = 
+                    row.querySelector('.presence-select').value;
+                row.querySelector('.notes-input').dataset.originalValue = 
+                    row.querySelector('.notes-input').value;
+                row.classList.remove('modified');
+            });
+            alert('Changes saved successfully!');
+        } else {
+            alert('Error saving changes');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error saving changes');
+    });
+}
+</script>
+{% endblock %} 

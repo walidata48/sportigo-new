@@ -125,6 +125,7 @@ class ASABookingSession(db.Model):
     start_time = db.Column(db.Time, nullable=False)
     end_time = db.Column(db.Time, nullable=False)
     status = db.Column(db.String(20), default='scheduled')  # scheduled, completed, cancelled
+    notes = db.Column(db.Text, nullable=True)
     
     schedule = db.relationship('ASASchedule')
 
@@ -1323,14 +1324,19 @@ def send_payment_reminders():
 @app.route('/admin/asa_attendance')
 @admin_required
 def admin_asa_attendance():
+    # Get date from query params or use today
     selected_date = request.args.get('date', datetime.now().date().strftime('%Y-%m-%d'))
     date_obj = datetime.strptime(selected_date, '%Y-%m-%d').date()
     
-    # Get all sessions for the selected date
-    sessions = ASABookingSession.query.filter(
-        ASABookingSession.session_date == date_obj,
-        ASABookingSession.status == 'scheduled'
-    ).all()
+    # Get all ASA sessions for the selected date
+    sessions = ASABookingSession.query\
+        .join(ASABooking)\
+        .join(ASASchedule)\
+        .filter(
+            ASABookingSession.session_date == date_obj,
+        )\
+        .order_by(ASASchedule.start_time)\
+        .all()
     
     return render_template(
         'admin/asa_attendance.html',
@@ -1338,17 +1344,24 @@ def admin_asa_attendance():
         selected_date=selected_date
     )
 
-@app.route('/admin/update_asa_attendance', methods=['POST'])
+@app.route('/update_asa_presence_batch', methods=['POST'])
 @admin_required
-def update_asa_attendance():
-    session_id = request.form.get('session_id')
-    status = request.form.get('status')  # 'present' or 'absent'
+def update_asa_presence_batch():
+    data = request.get_json()
+    updates = data.get('updates', [])
     
-    session = ASABookingSession.query.get_or_404(session_id)
-    session.status = status
-    db.session.commit()
-    
-    return jsonify({'success': True})
+    try:
+        for update in updates:
+            session = ASABookingSession.query.get(update['session_id'])
+            if session:
+                session.status = update['status']
+                session.notes = update.get('notes', '')
+        
+        db.session.commit()
+        return jsonify({'success': True})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)})
 
 @app.route('/my_notifications')
 @login_required
