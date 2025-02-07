@@ -43,6 +43,17 @@
                                 <a class="nav-link" href="{{ url_for('admin_dashboard') }}">Admin Dashboard</a>
                             </li>
                         {% endif %}
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('my_notifications') }}">
+                                Notifications
+                                {% if payment_notifications_count > 0 %}
+                                    <span class="badge bg-danger">{{ payment_notifications_count }}</span>
+                                {% endif %}
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('payment_history') }}">Payment History</a>
+                        </li>
                     {% else %}
                         <li class="nav-item">
                             <a class="nav-link" href="{{ url_for('login') }}">Login</a>

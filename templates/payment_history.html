@@ -1,0 +1,165 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>Payment History</h2>
+    
+    <div class="row mt-4">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">All Payments</h5>
+                    <div class="btn-group">
+                        <button class="btn btn-outline-secondary btn-sm" onclick="filterPayments('all')">All</button>
+                        <button class="btn btn-outline-secondary btn-sm" onclick="filterPayments('paid')">Paid</button>
+                        <button class="btn btn-outline-secondary btn-sm" onclick="filterPayments('pending')">Pending</button>
+                        <button class="btn btn-outline-secondary btn-sm" onclick="filterPayments('overdue')">Overdue</button>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover" id="paymentsTable">
+                            <thead>
+                                <tr>
+                                    <th>Due Date</th>
+                                    <th>Period</th>
+                                    <th>Package</th>
+                                    <th>Amount</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for payment in payment_history %}
+                                    <tr class="payment-row" data-status="{{ payment.status }}">
+                                        <td>{{ payment.payment_date.strftime('%d %B %Y') }}</td>
+                                        <td>
+                                            <span class="badge bg-info">{{ payment.period }}</span>
+                                        </td>
+                                        <td>
+                                            {{ payment.package_name }}
+                                            {% if not payment.is_active %}
+                                                <span class="badge bg-secondary">Inactive</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>Rp {{ "{:,}".format(payment.amount) }}</td>
+                                        <td>
+                                            {% if payment.status == 'paid' %}
+                                                <span class="badge bg-success">Paid</span>
+                                            {% elif payment.status == 'pending' %}
+                                                <span class="badge bg-warning">Pending</span>
+                                                <small class="text-muted d-block">
+                                                    Due in {{ (payment.payment_date - today).days }} days
+                                                </small>
+                                            {% else %}
+                                                <span class="badge bg-danger">Overdue</span>
+                                                <small class="text-muted d-block">
+                                                    Overdue by {{ (today - payment.payment_date).days }} days
+                                                </small>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% if payment.status in ['pending', 'overdue'] and payment.is_active %}
+                                                <button class="btn btn-primary btn-sm"
+                                                        onclick="processPayment('{{ payment.booking_id }}')">
+                                                    Pay Now
+                                                </button>
+                                            {% elif payment.status == 'paid' %}
+                                                <button class="btn btn-outline-secondary btn-sm" 
+                                                        onclick="viewReceipt('{{ payment.booking_id }}', '{{ payment.payment_date }}')">
+                                                    View Receipt
+                                                </button>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    {% if not payment_history %}
+                        <div class="text-center py-4">
+                            <p class="text-muted mb-0">No payment history available.</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function filterPayments(status) {
+    const rows = document.querySelectorAll('.payment-row');
+    rows.forEach(row => {
+        if (status === 'all' || row.dataset.status === status) {
+            row.style.display = '';
+        } else {
+            row.style.display = 'none';
+        }
+    });
+    
+    // Update active filter button
+    document.querySelectorAll('.btn-group .btn').forEach(btn => {
+        btn.classList.remove('active');
+    });
+    event.target.classList.add('active');
+}
+
+function processPayment(bookingId) {
+    if (confirm('Proceed with payment?')) {
+        window.location.href = `/asa/booking_confirmation/${bookingId}`;
+    }
+}
+
+function viewReceipt(bookingId, paymentDate) {
+    // Implement receipt view functionality
+    alert('Receipt viewer to be implemented');
+}
+
+// Initialize tooltips
+document.addEventListener('DOMContentLoaded', function() {
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
+    var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl)
+    });
+});
+</script>
+
+<style>
+.table th {
+    background-color: #f8f9fa;
+}
+
+.payment-row {
+    transition: all 0.2s ease;
+}
+
+.payment-row:hover {
+    background-color: #f8f9fa;
+}
+
+.badge {
+    padding: 0.5em 1em;
+}
+
+.btn-group .btn {
+    border-radius: 0;
+}
+
+.btn-group .btn:first-child {
+    border-top-left-radius: 4px;
+    border-bottom-left-radius: 4px;
+}
+
+.btn-group .btn:last-child {
+    border-top-right-radius: 4px;
+    border-bottom-right-radius: 4px;
+}
+
+.btn-group .btn.active {
+    background-color: #6c757d;
+    color: white;
+}
+</style>
+{% endblock %} 

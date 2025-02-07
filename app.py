@@ -107,7 +107,10 @@ class ASABooking(db.Model):
     package_id = db.Column(db.Integer, db.ForeignKey('asa_packages.id'), nullable=False)
     booking_date = db.Column(db.DateTime, default=datetime.utcnow)
     payment_status = db.Column(db.String(20), default='pending')
-    applied_discount = db.Column(db.Integer, default=0)  # Store actual discount amount
+    applied_discount = db.Column(db.Integer, default=0)
+    recurring_payment_date = db.Column(db.Integer)  # Day of month for recurring payment
+    next_payment_date = db.Column(db.Date)  # Next payment due date
+    is_active = db.Column(db.Boolean, default=True)
     
     package = db.relationship('ASAPool', backref='bookings')
     user = db.relationship('User', backref='asa_bookings')
@@ -679,134 +682,40 @@ def asa_booking_confirmation(booking_id):
     return render_template('asa/booking_confirmation.html', 
                          booking=booking,
                          package=package,
-                         datetime=datetime)
+                         now=datetime.now())
 
 @app.route('/update_asa_payment_status', methods=['POST'])
 @login_required
 def update_asa_payment_status():
     try:
         booking_id = request.form.get('booking_id')
-        start_date_str = request.form.get('start_date')
         applied_discount = request.form.get('applied_discount', type=int) or 0
-        
-        if not start_date_str:
-            return jsonify({
-                'success': False,
-                'message': 'Please select a start date'
-            })
         
         booking = ASABooking.query.get_or_404(booking_id)
         package = ASAPool.query.get(booking.package_id)
         
+        # Use today's date
+        today = datetime.now().date()
+        
         # Update booking with discount and payment status
         booking.applied_discount = applied_discount
         booking.payment_status = 'paid'
-        booking.payment_date = datetime.now()
         
-        # Different handling for trial vs regular packages
-        if package.is_trial:
-            # For trial, only create one session on the selected date
-            start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
-            
-            # Get available schedule for that day
-            day_name = calendar.day_name[start_date.weekday()]
-            # Convert English day name to Indonesian
-            day_mapping = {
-                'Monday': 'SENIN',
-                'Tuesday': 'SELASA',
-                'Wednesday': 'RABU',
-                'Thursday': 'KAMIS',
-                'Friday': 'JUMAT',
-                'Saturday': 'SABTU',
-                'Sunday': 'MINGGU'
-            }
-            indo_day = day_mapping.get(day_name)
-            
-            # Debug prints
-            print("Debug Information:")
-            print(f"Selected date: {start_date}")
-            print(f"Day name from calendar: {day_name}")
-            print(f"Converted to Indonesian: {indo_day}")
-            
-            # Get all schedules for debugging
-            all_schedules = ASASchedule.query.filter_by(package_id=package.id).all()
-            print("\nAvailable schedules in database:")
-            for s in all_schedules:
-                print(f"Day: {s.day_name}, Time: {s.start_time}-{s.end_time}")
-            
-            # Try to find the schedule
-            schedule = ASASchedule.query.filter_by(
-                package_id=package.id,
-                day_name=indo_day
-            ).first()
-            
-            if not schedule:
-                return jsonify({
-                    'success': False,
-                    'message': f'Debug: Looking for {indo_day}, Available days: {[s.day_name for s in all_schedules]}'
-                })
-            
-            session = ASABookingSession(
-                booking_id=booking.id,
-                schedule_id=schedule.id,
-                session_date=start_date,
-                start_time=schedule.start_time,
-                end_time=schedule.end_time,
-                status='scheduled'
-            )
-            db.session.add(session)
-            
-            db.session.commit()
-            return jsonify({
-                'success': True,
-                'message': 'Trial session payment successful! Your session has been scheduled.'
-            })
-            
-        else:
-            # Regular package logic
-            start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
-            end_date = start_date + timedelta(days=29)
-            
-            # Get schedules for this package
-            asa_schedules = ASASchedule.query.filter_by(package_id=package.id).all()
-            
-            # Generate schedules until end date
-            schedules = []
-            current_date = start_date
-            
-            # Create day mapping
-            day_mapping = {
-                'SENIN': 0, 'SELASA': 1, 'RABU': 2, 'KAMIS': 3, 
-                'JUMAT': 4, 'SABTU': 5, 'MINGGU': 6
-            }
-            
-            while current_date <= end_date:
-                for schedule in asa_schedules:
-                    if current_date.weekday() == day_mapping[schedule.day_name]:
-                        schedules.append(ASABookingSession(
-                            booking_id=booking.id,
-                            schedule_id=schedule.id,
-                            session_date=current_date,
-                            start_time=schedule.start_time,
-                            end_time=schedule.end_time,
-                            status='scheduled'
-                        ))
-                current_date += timedelta(days=1)
-            
-            # Verify we have at least 12 sessions for regular packages
-            if len(schedules) < 12:
-                return jsonify({
-                    'success': False,
-                    'message': 'Selected date range does not provide enough sessions. Please choose a different start date.'
-                })
-            
-            db.session.add_all(schedules)
-            db.session.commit()
-            
-            return jsonify({
-                'success': True,
-                'message': 'Payment successful! Your sessions have been scheduled.'
-            })
+        # Set recurring payment date (same day of month as today)
+        booking.recurring_payment_date = today.day
+        
+        # Set next payment date (one month from today)
+        booking.next_payment_date = (today.replace(day=1) + timedelta(days=32)).replace(day=today.day)
+        
+        db.session.commit()
+        
+        # Schedule automatic attendance sessions for Tue/Thu/Sat
+        schedule_attendance_sessions(booking.id, today)
+        
+        return jsonify({
+            'success': True,
+            'message': 'Payment successful! Your membership is now active.'
+        })
         
     except Exception as e:
         db.session.rollback()
@@ -814,6 +723,36 @@ def update_asa_payment_status():
             'success': False,
             'message': f'Payment failed: {str(e)}'
         })
+
+def schedule_attendance_sessions(booking_id, start_date):
+    """Create attendance sessions for the next month"""
+    booking = ASABooking.query.get(booking_id)
+    end_date = (start_date.replace(day=1) + timedelta(days=32)).replace(day=start_date.day)
+    
+    # Get all dates that are Tuesday, Thursday, or Saturday between start_date and end_date
+    current_date = start_date
+    while current_date < end_date:
+        # 1 = Tuesday, 3 = Thursday, 5 = Saturday
+        if current_date.weekday() in [1, 3, 5]:
+            # Get the schedule for this day
+            schedule = ASASchedule.query.filter_by(
+                package_id=booking.package_id,
+                day_name=current_date.strftime('%A').upper()
+            ).first()
+            
+            if schedule:
+                session = ASABookingSession(
+                    booking_id=booking_id,
+                    schedule_id=schedule.id,
+                    session_date=current_date,
+                    start_time=schedule.start_time,
+                    end_time=schedule.end_time,
+                    status='scheduled'
+                )
+                db.session.add(session)
+        current_date += timedelta(days=1)
+    
+    db.session.commit()
 
 @app.route('/asa/my_schedule/<int:booking_id>')
 @login_required
@@ -1336,6 +1275,173 @@ def get_available_times():
             'success': False,
             'message': str(e)
         })
+
+def send_payment_reminder_email(user_email, payment_date):
+    # Implement your email sending logic here
+    pass
+
+@app.cli.command("send-payment-reminders")
+def send_payment_reminders():
+    """Send payment reminders for upcoming recurring payments"""
+    today = datetime.now().date()
+    reminder_date = today + timedelta(days=3)  # H-3
+    
+    # Find all active bookings with upcoming payments
+    upcoming_payments = ASABooking.query.filter(
+        ASABooking.is_active == True,
+        ASABooking.next_payment_date == reminder_date
+    ).all()
+    
+    for booking in upcoming_payments:
+        send_payment_reminder_email(
+            booking.user.email,
+            booking.next_payment_date
+        )
+
+@app.route('/admin/asa_attendance')
+@admin_required
+def admin_asa_attendance():
+    selected_date = request.args.get('date', datetime.now().date().strftime('%Y-%m-%d'))
+    date_obj = datetime.strptime(selected_date, '%Y-%m-%d').date()
+    
+    # Get all sessions for the selected date
+    sessions = ASABookingSession.query.filter(
+        ASABookingSession.session_date == date_obj,
+        ASABookingSession.status == 'scheduled'
+    ).all()
+    
+    return render_template(
+        'admin/asa_attendance.html',
+        sessions=sessions,
+        selected_date=selected_date
+    )
+
+@app.route('/admin/update_asa_attendance', methods=['POST'])
+@admin_required
+def update_asa_attendance():
+    session_id = request.form.get('session_id')
+    status = request.form.get('status')  # 'present' or 'absent'
+    
+    session = ASABookingSession.query.get_or_404(session_id)
+    session.status = status
+    db.session.commit()
+    
+    return jsonify({'success': True})
+
+@app.route('/my_notifications')
+@login_required
+def my_notifications():
+    today = datetime.now().date()
+    
+    # Get all active ASA bookings for the user
+    asa_bookings = ASABooking.query.filter(
+        ASABooking.user_id == session['user_id'],
+        ASABooking.is_active == True
+    ).all()
+    
+    # Prepare notifications data
+    payment_notifications = []
+    for booking in asa_bookings:
+        if booking.next_payment_date:
+            days_until_payment = (booking.next_payment_date - today).days
+            status = 'upcoming'
+            if days_until_payment <= 3:
+                status = 'urgent'
+            elif days_until_payment < 0:
+                status = 'overdue'
+                
+            payment_notifications.append({
+                'booking_id': booking.id,
+                'package_name': booking.package.package_name,
+                'payment_date': booking.next_payment_date,
+                'days_until_payment': days_until_payment,
+                'amount': booking.package.price,
+                'status': status
+            })
+    
+    return render_template(
+        'notifications.html',
+        payment_notifications=payment_notifications,
+        today=today
+    )
+
+@app.context_processor
+def inject_notification_count():
+    if 'user_id' in session:
+        today = datetime.now().date()
+        # Count notifications for payments due within 3 days or overdue
+        payment_notifications_count = ASABooking.query.filter(
+            ASABooking.user_id == session['user_id'],
+            ASABooking.is_active == True,
+            ASABooking.next_payment_date <= today + timedelta(days=3)
+        ).count()
+        return {'payment_notifications_count': payment_notifications_count}
+    return {'payment_notifications_count': 0}
+
+@app.route('/payment_history')
+@login_required
+def payment_history():
+    # Get all ASA bookings for the user
+    asa_bookings = ASABooking.query.filter_by(
+        user_id=session['user_id']
+    ).order_by(
+        ASABooking.booking_date.desc()
+    ).all()
+    
+    # Prepare payment history data
+    payment_history = []
+    for booking in asa_bookings:
+        # Skip if booking_date is None
+        if not booking.booking_date:
+            continue
+            
+        # Calculate all monthly payments up to current date
+        payment_date = booking.booking_date.date()
+        today = datetime.now().date()
+        
+        while payment_date <= today:
+            payment_status = 'paid'
+            
+            # Check if next_payment_date exists before comparison
+            if booking.next_payment_date:
+                if payment_date == booking.next_payment_date:
+                    payment_status = 'pending'
+                elif payment_date > booking.next_payment_date:
+                    payment_status = 'overdue'
+                
+            # Calculate period (month and year this payment is for)
+            period_start = payment_date
+            period_end = (period_start.replace(day=1) + timedelta(days=32)).replace(day=1) - timedelta(days=1)
+                
+            payment_history.append({
+                'booking_id': booking.id,
+                'package_name': booking.package.package_name,
+                'payment_date': payment_date,
+                'period': f"{period_start.strftime('%B %Y')}",  # e.g., "November 2023"
+                'period_start': period_start,
+                'period_end': period_end,
+                'amount': booking.package.price - (booking.applied_discount or 0),
+                'status': payment_status,
+                'is_active': booking.is_active
+            })
+            
+            # Move to next month
+            try:
+                payment_date = (payment_date.replace(day=1) + timedelta(days=32)).replace(
+                    day=booking.recurring_payment_date or payment_date.day
+                )
+            except ValueError:
+                # Handle case where the day doesn't exist in the next month
+                next_month = payment_date.replace(day=1) + timedelta(days=32)
+                payment_date = next_month.replace(day=1)
+    
+    # Sort by payment date, most recent first
+    payment_history.sort(key=lambda x: x['payment_date'], reverse=True)
+    
+    return render_template(
+        'payment_history.html',
+        payment_history=payment_history
+    )
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5001)

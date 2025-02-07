@@ -35,195 +35,39 @@
 
                     {% if booking.payment_status == 'pending' %}
                     <div class="payment-actions mb-4">
-                        <div class="form-group mb-3">
-                            <label for="start_date">Select Start Date:</label>
-                            <input type="date" class="form-control" id="start_date" name="start_date" required>
-                            <small class="form-text text-muted">
-                                Trial sessions are available on Tuesday (Selasa), Thursday (Kamis), and Saturday (Sabtu) only.
-                            </small>
+                        <div class="alert alert-info">
+                            <p>Your monthly payment date will be set to day {{ now.day }} of each month.</p>
+                            <p>Training sessions are available on Tuesday, Thursday, and Saturday.</p>
                         </div>
                         
-                        <!-- Add coupon input section -->
-                        <div class="mb-3">
-                            <label for="coupon_code" class="form-label">Have a coupon?</label>
+                        <!-- Coupon section -->
+                        <div class="form-group mb-3">
+                            <label for="coupon_code">Have a coupon code?</label>
                             <div class="input-group">
-                                <input type="text" 
-                                       class="form-control" 
-                                       id="coupon_code" 
-                                       placeholder="Enter coupon code">
-                                <button class="btn btn-outline-secondary" 
-                                        type="button" 
-                                        onclick="applyCoupon()">Apply</button>
+                                <input type="text" class="form-control" id="coupon_code" placeholder="Enter coupon code">
+                                <button class="btn btn-secondary" type="button" onclick="applyCoupon()">Apply</button>
                             </div>
                             <div id="couponMessage" class="form-text"></div>
                         </div>
-                        
-                        <button type="button" 
-                                class="btn btn-success btn-lg w-100 mb-3"
-                                data-bs-toggle="modal" 
-                                data-bs-target="#paymentModal"
-                                onclick="showPaymentModal()">
-                            Pay Now
-                        </button>
-                    </div>
 
-                    <!-- Payment Modal -->
-                    <div class="modal fade" id="paymentModal">
-                        <div class="modal-dialog">
-                            <div class="modal-content">
-                                <div class="modal-header">
-                                    <h5 class="modal-title">Confirm Payment</h5>
-                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                                </div>
-                                <div class="modal-body">
-                                    <p>Are you sure you want to proceed with the payment?</p>
-                                    <p>Start Date: <span id="confirmStartDate" class="fw-bold"></span></p>
-                                    <div class="price-breakdown">
-                                        <p>Original Price: <span class="fw-bold">Rp {{ "{:,}".format(package.price) }}</span></p>
-                                        <p id="discountRow" style="display: none;" class="text-success">
-                                            Discount: <span id="discountAmount" class="fw-bold"></span>
-                                        </p>
-                                        <p class="fw-bold">Final Price: <span id="finalPrice">Rp {{ "{:,}".format(package.price) }}</span></p>
-                                    </div>
-                                </div>
-                                <div class="modal-footer">
-                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                                    <form id="paymentForm" method="POST" action="{{ url_for('update_asa_payment_status') }}">
-                                        <input type="hidden" name="booking_id" value="{{ booking.id }}">
-                                        <input type="hidden" name="applied_discount" value="{{ booking.applied_discount or 0 }}">
-                                        <input type="hidden" name="start_date" id="form_start_date">
-                                        <button type="submit" class="btn btn-success">Confirm Payment</button>
-                                    </form>
-                                </div>
-                            </div>
+                        <!-- Price display -->
+                        <div class="price-info mb-3">
+                            <h5>Payment Details</h5>
+                            <p>Package Price: Rp {{ "{:,}".format(package.price) }}</p>
+                            <p id="discountDisplay" style="display: none;">Discount: Rp <span id="discountAmount">0</span></p>
+                            <p>Final Price: Rp <span id="finalPrice">{{ "{:,}".format(package.price) }}</span></p>
                         </div>
+
+                        <!-- Payment button -->
+                        <button class="btn btn-primary" onclick="processPayment()">Proceed to Payment</button>
                     </div>
-
-                    <script>
-                    function formatDate(dateString) {
-                        const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
-                        const date = new Date(dateString);
-                        return date.toLocaleDateString('id-ID', options);
-                    }
-
-                    let appliedDiscount = 0;
-
-                    function applyCoupon() {
-                        const couponCode = document.getElementById('coupon_code').value;
-                        if (!couponCode) {
-                            alert('Please enter a coupon code');
-                            return;
-                        }
-
-                        fetch('{{ url_for("apply_asa_coupon") }}', {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/x-www-form-urlencoded',
-                            },
-                            body: new URLSearchParams({
-                                'coupon_code': couponCode,
-                                'package_price': '{{ package.price }}'
-                            })
-                        })
-                        .then(response => response.json())
-                        .then(data => {
-                            const messageDiv = document.getElementById('couponMessage');
-                            if (data.success) {
-                                messageDiv.className = 'form-text text-success';
-                                appliedDiscount = data.discount_amount;
-                                updatePriceDisplay();
-                            } else {
-                                messageDiv.className = 'form-text text-danger';
-                                appliedDiscount = 0;
-                                updatePriceDisplay();
-                            }
-                            messageDiv.textContent = data.message;
-                        })
-                        .catch(error => {
-                            console.error('Error:', error);
-                            alert('An error occurred while applying the coupon');
-                        });
-                    }
-
-                    function updatePriceDisplay() {
-                        const originalPrice = {{ package.price }};
-                        const finalPrice = originalPrice - appliedDiscount;
-                        
-                        const discountRow = document.getElementById('discountRow');
-                        const discountAmount = document.getElementById('discountAmount');
-                        const finalPriceElement = document.getElementById('finalPrice');
-                        
-                        if (appliedDiscount > 0) {
-                            discountRow.style.display = 'block';
-                            discountAmount.textContent = `- Rp ${appliedDiscount.toLocaleString('id-ID')}`;
-                        } else {
-                            discountRow.style.display = 'none';
-                        }
-                        
-                        finalPriceElement.textContent = `Rp ${finalPrice.toLocaleString('id-ID')}`;
-                    }
-
-                    function showPaymentModal() {
-                        const startDate = document.getElementById('start_date').value;
-                        if (!startDate) {
-                            alert('Please select a start date first');
-                            return;
-                        }
-                        
-                        // Set the formatted date in the modal
-                        document.getElementById('confirmStartDate').textContent = formatDate(startDate);
-                        // Set the date value in the hidden form field
-                        document.getElementById('form_start_date').value = startDate;
-                        // Update the form's applied discount
-                        document.querySelector('input[name="applied_discount"]').value = appliedDiscount;
-                    }
-
-                    // Add this function to validate available days
-                    function validateDate(date) {
-                        const dayOfWeek = new Date(date).getDay();
-                        // 2 = Tuesday (Selasa), 4 = Thursday (Kamis), 6 = Saturday (Sabtu)
-                        const validDays = [2, 4, 6];  // These numbers correspond to the same days in any language
-                        return validDays.includes(dayOfWeek);
-                    }
-
-                    // Add this to your existing script
-                    document.getElementById('start_date').addEventListener('change', function(e) {
-                        if (!validateDate(this.value)) {
-                            alert('Please select either Tuesday (Selasa), Thursday (Kamis), or Saturday (Sabtu) for trial sessions.');
-                            this.value = ''; // Clear the invalid date
-                        }
-                    });
-
-                    document.getElementById('paymentForm').addEventListener('submit', function(e) {
-                        e.preventDefault();
-                        
-                        const startDate = document.getElementById('start_date').value;
-                        if (!validateDate(startDate)) {
-                            alert('Please select either Tuesday (Selasa), Thursday (Kamis), or Saturday (Sabtu) for trial sessions.');
-                            return;
-                        }
-                        
-                        const formData = new FormData(this);
-                        
-                        fetch('{{ url_for("update_asa_payment_status") }}', {
-                            method: 'POST',
-                            body: formData
-                        })
-                        .then(response => response.json())
-                        .then(data => {
-                            if (data.success) {
-                                window.location.href = '{{ url_for("home") }}';
-                            } else {
-                                alert(data.message || 'An error occurred');
-                            }
-                        })
-                        .catch(error => {
-                            console.error('Error:', error);
-                            alert('An error occurred while processing payment');
-                        });
-                    });
-                    </script>
                     {% else %}
+                    <div class="membership-info mb-4">
+                        <h5>Membership Details</h5>
+                        <p>Next Payment Due: {{ booking.next_payment_date.strftime('%d %B %Y') }}</p>
+                        <p>Monthly Payment Date: Day {{ booking.recurring_payment_date }} of each month</p>
+                        <p>Training Schedule: Every Tuesday, Thursday, and Saturday</p>
+                    </div>
                     <div class="mt-4">
                         <a href="{{ url_for('asa_my_schedule', booking_id=booking.id) }}" 
                            class="btn btn-primary btn-lg">
@@ -295,57 +139,85 @@
 
 {% block scripts %}
 <script>
-document.getElementById('paymentForm').addEventListener('submit', function(e) {
-    e.preventDefault();
+let appliedDiscount = 0;
+
+function updatePriceDisplay() {
+    const packagePrice = {{ package.price }};
+    const finalPrice = packagePrice - appliedDiscount;
     
-    const formData = new FormData(this);
+    document.getElementById('finalPrice').textContent = finalPrice.toLocaleString();
     
+    const discountDisplay = document.getElementById('discountDisplay');
+    const discountAmount = document.getElementById('discountAmount');
+    
+    if (appliedDiscount > 0) {
+        discountAmount.textContent = appliedDiscount.toLocaleString();
+        discountDisplay.style.display = 'block';
+    } else {
+        discountDisplay.style.display = 'none';
+    }
+}
+
+function processPayment() {
     fetch('{{ url_for("update_asa_payment_status") }}', {
         method: 'POST',
-        body: formData
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams({
+            'booking_id': '{{ booking.id }}',
+            'applied_discount': appliedDiscount
+        })
     })
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            window.location.href = '{{ url_for("home") }}';
+            alert(data.message);
+            window.location.reload();
         } else {
-            alert(data.message || 'An error occurred');
+            alert('Payment failed: ' + data.message);
         }
     })
     .catch(error => {
         console.error('Error:', error);
         alert('An error occurred while processing payment');
     });
-});
+}
 
 function applyCoupon() {
     const couponCode = document.getElementById('coupon_code').value;
-    const packagePrice = {{ package.price }};
+    if (!couponCode) {
+        alert('Please enter a coupon code');
+        return;
+    }
 
     fetch('{{ url_for("apply_asa_coupon") }}', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/x-www-form-urlencoded',
         },
-        body: `coupon_code=${couponCode}&package_price=${packagePrice}`
+        body: new URLSearchParams({
+            'coupon_code': couponCode,
+            'package_price': '{{ package.price }}'
+        })
     })
     .then(response => response.json())
     .then(data => {
-        const discountInfo = document.getElementById('discountInfo');
+        const messageDiv = document.getElementById('couponMessage');
         if (data.success) {
-            document.getElementById('applied_discount').value = data.discount_amount;
-            discountInfo.textContent = data.message;
-            discountInfo.style.display = 'block';
-            discountInfo.className = 'alert alert-success';
+            messageDiv.className = 'form-text text-success';
+            appliedDiscount = data.discount_amount;
+            updatePriceDisplay();
         } else {
-            discountInfo.textContent = data.message;
-            discountInfo.style.display = 'block';
-            discountInfo.className = 'alert alert-danger';
+            messageDiv.className = 'form-text text-danger';
+            appliedDiscount = 0;
+            updatePriceDisplay();
         }
+        messageDiv.textContent = data.message;
     })
     .catch(error => {
         console.error('Error:', error);
-        alert('Error applying coupon');
+        alert('An error occurred while applying the coupon');
     });
 }
 </script>
