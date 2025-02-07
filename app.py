@@ -679,9 +679,14 @@ def asa_booking_confirmation(booking_id):
     booking = ASABooking.query.get_or_404(booking_id)
     package = ASAPool.query.get(booking.package_id)
     
-    return render_template('asa/booking_confirmation.html', 
+    # Check if registration is after the 10th
+    today = datetime.now().date()
+    is_prorated = today.day > 10
+    
+    return render_template('asa/payment_transfer.html', 
                          booking=booking,
                          package=package,
+                         is_prorated=is_prorated,
                          now=datetime.now())
 
 @app.route('/update_asa_payment_status', methods=['POST'])
@@ -694,22 +699,39 @@ def update_asa_payment_status():
         booking = ASABooking.query.get_or_404(booking_id)
         package = ASAPool.query.get(booking.package_id)
         
-        # Use today's date
         today = datetime.now().date()
+        
+        # Set recurring payment date to the 1st of each month
+        booking.recurring_payment_date = 1
+        
+        # Calculate next payment date
+        next_month = (today.replace(day=1) + timedelta(days=32)).replace(day=1)
+        booking.next_payment_date = next_month
+        
+        # If registration is after the 10th, generate a prorated coupon for next month
+        if today.day > 10:
+            # Calculate prorated amount based on remaining days in month
+            days_in_month = calendar.monthrange(today.year, today.month)[1]
+            remaining_days = days_in_month - today.day
+            prorated_amount = int((package.price / days_in_month) * remaining_days)
+            
+            # Create coupon for next month
+            coupon = Coupon(
+                code=f"PRORATED{booking.id}",
+                discount_amount=prorated_amount,
+                valid_until=next_month.replace(day=10),  # Valid until 10th of next month
+                is_active=True,
+                user_id=session['user_id']
+            )
+            db.session.add(coupon)
         
         # Update booking with discount and payment status
         booking.applied_discount = applied_discount
         booking.payment_status = 'paid'
         
-        # Set recurring payment date (same day of month as today)
-        booking.recurring_payment_date = today.day
-        
-        # Set next payment date (one month from today)
-        booking.next_payment_date = (today.replace(day=1) + timedelta(days=32)).replace(day=today.day)
-        
         db.session.commit()
         
-        # Schedule automatic attendance sessions for Tue/Thu/Sat
+        # Schedule automatic attendance sessions
         schedule_attendance_sessions(booking.id, today)
         
         return jsonify({
