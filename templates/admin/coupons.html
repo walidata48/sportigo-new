@@ -33,12 +33,10 @@
                     <div class="col-md-3">
                         <div class="form-group">
                             <label for="user_id">Specific User (Optional)</label>
-                            <select class="form-control" id="user_id" name="user_id">
-                                <option value="">General Coupon</option>
-                                {% for user in users %}
-                                <option value="{{ user.id }}">{{ user.username }}</option>
-                                {% endfor %}
+                            <select class="form-control select2-users" id="user_id" name="user_id">
+                                <option></option>
                             </select>
+                            <small class="form-text text-muted"> </small>
                         </div>
                     </div>
                 </div>
@@ -110,35 +108,103 @@
     </div>
 </div>
 
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    // Handle toggle switches
-    document.querySelectorAll('.toggle-coupon').forEach(toggle => {
-        toggle.addEventListener('change', function() {
-            const couponId = this.dataset.couponId;
-            fetch(`/admin/coupons/toggle/${couponId}`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
+$(document).ready(function() {
+    $('.select2-users').select2({
+        width: '100%',
+        placeholder: ' ',
+        allowClear: true,
+        ajax: {
+            url: '/admin/users/search',
+            dataType: 'json',
+            delay: 250,
+            data: function(params) {
+                return {
+                    q: params.term || '',
+                    page: params.page || 1
+                };
+            },
+            processResults: function(data, params) {
+                params.page = params.page || 1;
+                
+                let results = data.users;
+                if (params.page === 1) {
+                    results = [{
+                        id: '',
+                        text: 'General Coupon'
+                    }].concat(results);
                 }
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (!data.success) {
-                    alert('Error updating coupon status');
-                    this.checked = !this.checked;
-                }
-                // Update label text
-                const label = this.nextElementSibling;
-                label.textContent = this.checked ? 'Active' : 'Inactive';
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                alert('Error updating coupon status');
-                this.checked = !this.checked;
-            });
-        });
+                
+                return {
+                    results: results,
+                    pagination: {
+                        more: data.has_more
+                    }
+                };
+            },
+            cache: true
+        },
+        minimumInputLength: 0,
+        templateResult: formatUser,
+        templateSelection: formatUserSelection
     });
 });
+
+function formatUser(user) {
+    if (user.loading) {
+        return 'Searching...';
+    }
+    
+    if (!user.username) {
+        return user.text;
+    }
+
+    return $(`
+        <div class="select2-result-user">
+            <div class="user-name">${user.username}</div>
+            <div class="user-email text-muted small">${user.email}</div>
+        </div>
+    `);
+}
+
+function formatUserSelection(user) {
+    return user.text || `${user.username} (${user.email})`;
+}
 </script>
+
+<style>
+.select2-container {
+    width: 100% !important;
+}
+
+.select2-container .select2-selection--single {
+    height: 38px !important;
+}
+
+.select2-container--default .select2-selection--single {
+    border: 1px solid #ced4da;
+    border-radius: 4px;
+}
+
+.select2-container--default .select2-selection--single .select2-selection__rendered {
+    line-height: 36px;
+}
+
+.select2-container--default .select2-selection--single .select2-selection__arrow {
+    height: 36px;
+}
+
+.select2-result-user {
+    padding: 4px 0;
+}
+
+.select2-result-user .user-email {
+    font-size: 0.875em;
+    color: #6c757d;
+}
+</style>
 {% endblock %} 

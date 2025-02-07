@@ -6,7 +6,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from functools import wraps
 from flask_migrate import Migrate
 from flask.cli import FlaskGroup
-from sqlalchemy import distinct
+from sqlalchemy import distinct, or_
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://waliy:12345@localhost/swim'
@@ -1552,6 +1552,40 @@ def delete_coupon(coupon_id):
         db.session.rollback()
         flash(f'Error deleting coupon: {str(e)}', 'error')
     return redirect(url_for('admin_coupons'))
+
+@app.route('/admin/users/search')
+@admin_required
+def search_users():
+    query = request.args.get('q', '')
+    page = request.args.get('page', 1, type=int)
+    per_page = 10
+
+    # If no query, return empty results (except on first page)
+    if not query and page > 1:
+        return jsonify({'users': [], 'has_more': False})
+
+    # Build the query
+    users_query = User.query
+    if query:
+        users_query = users_query.filter(
+            or_(
+                User.username.ilike(f'%{query}%'),
+                User.email.ilike(f'%{query}%')
+            )
+        )
+
+    # Get paginated results
+    users = users_query.paginate(page=page, per_page=per_page, error_out=False)
+
+    return jsonify({
+        'users': [{
+            'id': user.id,
+            'username': user.username,
+            'email': user.email,
+            'text': f"{user.username} ({user.email})"
+        } for user in users.items],
+        'has_more': users.has_next
+    })
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5001)
