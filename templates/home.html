@@ -138,6 +138,7 @@
     background: #f8f9fa;
     padding: 25px;
     border-radius: 15px;
+    min-height: fit-content;
 }
 
 .booking-section h3 {
@@ -150,6 +151,9 @@
     border: none;
     box-shadow: 0 2px 10px rgba(0,0,0,0.1);
     transition: transform 0.2s ease;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
 }
 
 .booking-card .card:hover {
@@ -159,6 +163,13 @@
 .booking-card .card-title {
     color: #007bff;
     font-size: 1.2rem;
+}
+
+.booking-card .card-body {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    padding: 1rem;
 }
 
 .sessions-list {
@@ -189,6 +200,28 @@
 
 .btn-primary:hover {
     background-color: #0056b3;
+}
+
+.booking-section:empty,
+.booking-section:has(.text-muted:only-child) {
+    padding: 15px;
+    min-height: auto;
+}
+
+@media (max-width: 768px) {
+    .booking-section {
+        padding: 15px;
+        margin-bottom: 15px !important;
+    }
+    
+    .booking-card .card-body {
+        padding: 0.75rem;
+    }
+    
+    .sessions-list {
+        padding: 10px;
+        margin-top: 10px;
+    }
 }
 </style>
 {% endblock %} 

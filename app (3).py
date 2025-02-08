@@ -10,17 +10,16 @@ from sqlalchemy import distinct, or_
 import midtransclient
 
 app = Flask(__name__)
-app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://waliy:12345@localhost/swim'
+application = app
+app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://sportigo_root:-NG3!Q]CI]vL@localhost/sportigo_swim'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.secret_key = 'your-secret-key-here'  
-db = SQLAlchemy(app)
-migrate = Migrate(app, db)
 
 MIDTRANS_SERVER_KEY = 'SB-Mid-server-1EZNZC7WrVYhVQhK_V22gtDM'  # Ganti dengan server key Anda
 MIDTRANS_CLIENT_KEY = 'SB-Mid-client-_2sU7mKfWAXz2N4S'  # Ganti dengan client key Anda
 
-#db = SQLAlchemy(app)
-#migrate = Migrate(app, db)
+db = SQLAlchemy(app)
+migrate = Migrate(app, db)
 
 snap = midtransclient.Snap(
     is_production=False,  # Tentukan apakah Anda menggunakan lingkungan produksi

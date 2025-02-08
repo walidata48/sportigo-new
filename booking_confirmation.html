@@ -127,8 +127,7 @@ async function proceedToPayment(bookingId, grossAmount, itemName) {
                     //         booking_id: res.order_id
                     //     })
                     // });
-                    // alert("Payment Success: " + JSON.stringify(result));
-                    window.location.href = '/home';
+                    alert("Payment Success: " + JSON.stringify(result));
                 },
                 onPending: function(result) {
                     alert("Payment Pending: " + JSON.stringify(result));
