@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container py-5">
+    <h1 class="display-4 text-center mb-5 position-relative">
+        Our Professional Coaches
+        <div class="title-underline"></div>
+    </h1>
+    
+    <div class="row g-4">
+        {% for coach in coaches %}
+        <div class="col-md-6 col-lg-4">
+            <div class="coach-card card h-100 border-0 shadow-sm">
+                <div class="position-relative overflow-hidden">
+                    <img src="{{ coach.profile_image }}" alt="{{ coach.name }}" 
+                         class="card-img-top coach-image">
+                    <div class="coach-overlay"></div>
+                </div>
+                <div class="card-body position-relative">
+                    <div class="experience-badge">
+                        {{ coach.experience_years }}+ years
+                    </div>
+                    <h2 class="card-title h4 mb-2">{{ coach.name }}</h2>
+                    <p class="card-text text-primary fw-semibold mb-3">{{ coach.specialization }}</p>
+                    
+                    <div class="coach-stats d-flex justify-content-between align-items-center mb-3">
+                        <div class="d-flex align-items-center">
+                            <i class="bi bi-star-fill text-warning me-1"></i>
+                            <span class="text-muted">4.9</span>
+                        </div>
+                        <div class="d-flex align-items-center">
+                            <i class="bi bi-people-fill text-primary me-1"></i>
+                            <span class="text-muted">200+ students</span>
+                        </div>
+                    </div>
+                    
+                    <a href="{{ url_for('coach_profile', coach_id=coach.id) }}" 
+                       class="btn btn-outline-primary w-100">View Profile</a>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<style>
+.title-underline {
+    width: 80px;
+    height: 4px;
+    background: linear-gradient(90deg, #0d6efd, #0dcaf0);
+    margin: 15px auto 0;
+    border-radius: 2px;
+}
+
+.coach-card {
+    transition: transform 0.3s ease;
+    border-radius: 12px;
+}
+
+.coach-card:hover {
+    transform: translateY(-5px);
+}
+
+.coach-image {
+    height: 300px;
+    object-fit: cover;
+    transition: transform 0.5s ease;
+}
+
+.coach-card:hover .coach-image {
+    transform: scale(1.05);
+}
+
+.coach-overlay {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 50%;
+    background: linear-gradient(to top, rgba(255,255,255,1), rgba(255,255,255,0));
+}
+
+.experience-badge {
+    position: absolute;
+    top: -15px;
+    right: 20px;
+    background: linear-gradient(45deg, #0d6efd, #0dcaf0);
+    color: white;
+    padding: 5px 15px;
+    border-radius: 20px;
+    font-size: 0.9rem;
+    font-weight: 500;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+}
+
+.coach-stats {
+    font-size: 0.9rem;
+}
+</style>
+{% endblock %} 

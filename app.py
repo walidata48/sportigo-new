@@ -8,6 +8,7 @@ from flask_migrate import Migrate
 from flask.cli import FlaskGroup
 from sqlalchemy import distinct, or_
 import midtransclient
+import json
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://waliy:12345@localhost/swim'
@@ -140,6 +141,29 @@ class ASABookingSession(db.Model):
     notes = db.Column(db.Text, nullable=True)
     
     schedule = db.relationship('ASASchedule')
+
+class Coach(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)
+    profile_image = db.Column(db.String(255))  # URL or path to image
+    specialization = db.Column(db.String(100))
+    experience_years = db.Column(db.Integer)
+    bio = db.Column(db.Text)
+    certifications = db.Column(db.Text)
+    achievements = db.Column(db.Text)
+    is_active = db.Column(db.Boolean, default=True)
+
+class Pool(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)
+    address = db.Column(db.Text, nullable=False)
+    description = db.Column(db.Text)
+    features = db.Column(db.Text)  # Store as comma-separated values
+    main_image = db.Column(db.String(255))  # URL or path to main image
+    gallery_images = db.Column(db.Text)  # Store as comma-separated URLs/paths
+    opening_hours = db.Column(db.Text)  # Store as JSON string
+    contact_info = db.Column(db.String(255))
+    is_active = db.Column(db.Boolean, default=True)
 
 def login_required(f):
     @wraps(f)
@@ -1711,6 +1735,37 @@ def search_users():
         } for user in users.items],
         'has_more': users.has_next
     })
+
+@app.route('/coaches')
+def coaches():
+    coaches_list = Coach.query.filter_by(is_active=True).all()
+    return render_template('coaches.html', coaches=coaches_list)
+
+@app.route('/coach/<int:coach_id>')
+def coach_profile(coach_id):
+    coach = Coach.query.get_or_404(coach_id)
+    return render_template('coach_profile.html', coach=coach)
+
+@app.route('/pools')
+def pools():
+    pools_list = Pool.query.filter_by(is_active=True).all()
+    return render_template('pools.html', pools=pools_list)
+
+@app.route('/pool/<int:pool_id>')
+def pool_profile(pool_id):
+    pool = Pool.query.get_or_404(pool_id)
+    # Convert string of gallery images to list
+    gallery = pool.gallery_images.split(',') if pool.gallery_images else []
+    # Convert string of features to list
+    features = pool.features.split(',') if pool.features else []
+    # Parse opening hours from JSON string
+    opening_hours = json.loads(pool.opening_hours) if pool.opening_hours else {}
+    
+    return render_template('pool_profile.html', 
+                         pool=pool,
+                         gallery=gallery,
+                         features=features,
+                         opening_hours=opening_hours)
 
 if __name__ == '__main__':
     app.run(debug=True)

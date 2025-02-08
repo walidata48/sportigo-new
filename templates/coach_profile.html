@@ -1,0 +1,283 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="coach-profile">
+    <!-- Hero Section -->
+    <div class="profile-header">
+        <div class="container">
+            <div class="row g-4 align-items-center py-5">
+                <!-- Profile Image -->
+                <div class="col-md-4 text-center text-md-start">
+                    <div class="profile-image-wrapper">
+                        <img src="{{ coach.profile_image }}" alt="{{ coach.name }}" class="profile-image">
+                        
+                    </div>
+                </div>
+                
+                <!-- Profile Info -->
+                <div class="col-md-8">
+                    <div class="profile-info">
+                        <h1 class="display-4 mb-2">{{ coach.name }}</h1>
+                        <div class="specialization mb-4">
+                            <span class="badge bg-primary-subtle text-primary-emphasis">
+                                {{ coach.specialization }}
+                            </span>
+                        </div>
+                        
+                        <div class="stats-row d-flex flex-wrap gap-4 mb-4">
+                            <div class="stat-item">
+                                <i class="bi bi-star-fill text-warning"></i>
+                                <span class="stat-label">Rating</span>
+                                <span class="stat-value">4.9/5.0</span>
+                            </div>
+                            <div class="stat-item">
+                                <i class="bi bi-people-fill text-primary"></i>
+                                <span class="stat-label">Students</span>
+                                <span class="stat-value">200+</span>
+                            </div>
+                            <div class="stat-item">
+                                <i class="bi bi-calendar2-check text-success"></i>
+                                <span class="stat-label">Sessions</span>
+                                <span class="stat-value">1.2k+</span>
+                            </div>
+                        </div>
+                        
+                        <div class="d-flex gap-3">
+                            <button class="btn btn-primary btn-lg">
+                                <i class="bi bi-calendar-check me-2"></i>Book a Session
+                            </button>
+                            <button class="btn btn-outline-primary btn-lg">
+                                <i class="bi bi-chat-dots me-2"></i>Message
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="container">
+        <div class="row g-4">
+            <!-- Left Column -->
+            <div class="col-lg-8">
+                <!-- About Section -->
+                <div class="content-card">
+                    <h2 class="section-title">About</h2>
+                    <p class="text-gray-700 coach-bio">{{ coach.bio }}</p>
+                </div>
+
+                <!-- Certifications -->
+                {% if coach.certifications %}
+                <div class="content-card">
+                    <h2 class="section-title">Certifications</h2>
+                    <div class="row g-3">
+                        {% for cert in coach.certifications.split('\n') %}
+                        <div class="col-md-6">
+                            <div class="certification-item">
+                                <i class="bi bi-patch-check-fill text-success me-2"></i>
+                                <span>{{ cert }}</span>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- Achievements -->
+                {% if coach.achievements %}
+                <div class="content-card">
+                    <h2 class="section-title">Achievements</h2>
+                    <div class="achievements-list">
+                        {% for achievement in coach.achievements.split('\n') %}
+                        <div class="achievement-item">
+                            <i class="bi bi-trophy-fill text-warning me-2"></i>
+                            <span>{{ achievement }}</span>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Right Column -->
+            <div class="col-lg-4">
+                <!-- Contact Card -->
+                <div class="content-card sticky-top" style="top: 2rem;">
+                    <h2 class="section-title">Contact Information</h2>
+                    <div class="d-grid gap-2 mb-4">
+                        <button class="btn btn-primary btn-lg">
+                            <i class="bi bi-calendar-check me-2"></i>Book a Session
+                        </button>
+                        <button class="btn btn-outline-primary btn-lg">
+                            <i class="bi bi-chat-dots me-2"></i>Message Coach
+                        </button>
+                    </div>
+
+                    <!-- Schedule -->
+                    <h3 class="h5 mb-3">Available Times</h3>
+                    <div class="schedule-list">
+                        <div class="schedule-item">
+                            <span class="day">Monday</span>
+                            <span class="time">9:00 AM - 5:00 PM</span>
+                        </div>
+                        <!-- Add more schedule items as needed -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.profile-header {
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    margin-top: -2rem;
+    padding: 3rem 0;
+    border-bottom: 1px solid rgba(0,0,0,0.05);
+}
+
+.profile-image-wrapper {
+    position: relative;
+    display: inline-block;
+}
+
+.profile-image {
+    width: 280px;
+    height: 280px;
+    object-fit: cover;
+    border-radius: 20px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+    border: 5px solid white;
+}
+
+.experience-badge {
+    position: absolute;
+    bottom: -15px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: linear-gradient(45deg, #0d6efd, #0dcaf0);
+    color: white;
+    padding: 8px 20px;
+    border-radius: 30px;
+    font-weight: 500;
+    font-size: 0.9rem;
+    white-space: nowrap;
+    box-shadow: 0 4px 15px rgba(13, 110, 253, 0.2);
+}
+
+.profile-info {
+    padding-left: 2rem;
+}
+
+.specialization .badge {
+    padding: 0.8rem 1.5rem;
+    font-size: 1rem;
+    font-weight: 500;
+}
+
+.stats-row {
+    border-left: 3px solid #0d6efd;
+    padding-left: 1.5rem;
+}
+
+.stat-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    min-width: 100px;
+}
+
+.stat-item i {
+    font-size: 1.5rem;
+    margin-bottom: 0.5rem;
+}
+
+.stat-label {
+    font-size: 0.9rem;
+    color: #6c757d;
+    margin-bottom: 0.2rem;
+}
+
+.stat-value {
+    font-weight: 600;
+    font-size: 1.1rem;
+    color: #2d3748;
+}
+
+@media (max-width: 768px) {
+    .profile-info {
+        padding-left: 0;
+        text-align: center;
+    }
+    
+    .stats-row {
+        justify-content: center;
+        border-left: none;
+        padding-left: 0;
+    }
+    
+    .profile-image {
+        width: 220px;
+        height: 220px;
+    }
+}
+
+.content-card {
+    background: white;
+    border-radius: 1rem;
+    padding: 2rem;
+    box-shadow: 0 2px 15px rgba(0,0,0,0.05);
+    margin-bottom: 1.5rem;
+}
+
+.section-title {
+    font-size: 1.5rem;
+    font-weight: 600;
+    margin-bottom: 1.5rem;
+    color: #2d3748;
+}
+
+.coach-bio {
+    line-height: 1.8;
+    white-space: pre-line;
+}
+
+.certification-item {
+    background: #f8fafc;
+    padding: 1rem;
+    border-radius: 0.5rem;
+    display: flex;
+    align-items: center;
+}
+
+.achievement-item {
+    display: flex;
+    align-items: center;
+    padding: 1rem;
+    border-bottom: 1px solid #edf2f7;
+}
+
+.achievement-item:last-child {
+    border-bottom: none;
+}
+
+.schedule-item {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.75rem;
+    background: #f8fafc;
+    border-radius: 0.5rem;
+    margin-bottom: 0.5rem;
+}
+
+.day {
+    font-weight: 500;
+}
+
+.time {
+    color: #64748b;
+}
+</style>
+{% endblock %} 
