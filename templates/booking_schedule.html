@@ -3,15 +3,50 @@
 {% block content %}
 <section class="booking-section py-5">
     <div class="container">
-        <h2 class="text-center mb-5">Pilih Jadwal Latihan</h2>
+        <div class="text-center mb-5">
+            <h2 class="display-4 fw-bold">Pilih Jadwal Latihan</h2>
+            <p class="text-muted lead">Pilih jenis booking dan jadwal yang sesuai dengan kebutuhan Anda</p>
+        </div>
         
         <!-- Booking Type Selection -->
-        <div class="row mb-4">
+        <div class="row mb-5">
             <div class="col-lg-8 mx-auto">
-                <div class="booking-type-selector text-center">
-                    <div class="btn-group" role="group">
-                        <button type="button" class="btn btn-outline-primary active" data-booking-type="regular">Regular (4 Minggu)</button>
-                        <button type="button" class="btn btn-outline-primary" data-booking-type="daily">Trial / Harian</button>
+                <div class="booking-type-selector">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <div class="booking-type-card">
+                                <div class="card h-100 shadow-sm booking-type-option active" onclick="selectBookingType('regular', this)">
+                                    <div class="card-body text-center p-4">
+                                        <div class="booking-type-icon mb-3">
+                                            <i class="fas fa-calendar-alt fa-2x text-primary"></i>
+                                        </div>
+                                        <h4 class="card-title">Regular</h4>
+                                        <p class="card-text text-muted">4 Minggu Berturut-turut</p>
+                                        <div class="booking-type-features">
+                                            <span class="badge bg-primary-soft mb-2">Hemat Biaya</span>
+                                            <span class="badge bg-primary-soft">Jadwal Tetap</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="booking-type-card">
+                                <div class="card h-100 shadow-sm booking-type-option" onclick="selectBookingType('daily', this)">
+                                    <div class="card-body text-center p-4">
+                                        <div class="booking-type-icon mb-3">
+                                            <i class="fas fa-stopwatch fa-2x text-primary"></i>
+                                        </div>
+                                        <h4 class="card-title">Trial / Harian</h4>
+                                        <p class="card-text text-muted">Satu Kali Latihan</p>
+                                        <div class="booking-type-features">
+                                            <span class="badge bg-primary-soft mb-2">Fleksibel</span>
+                                            <span class="badge bg-primary-soft">Coba Dulu</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -19,56 +54,200 @@
 
         <div class="row">
             <div class="col-lg-8 mx-auto">
-                <div class="booking-form">
-                    <form id="bookingForm" action="{{ url_for('process_booking') }}" method="POST">
-                        <!-- Hidden input for booking type -->
-                        <input type="hidden" name="booking_type" id="bookingType" value="regular">
+                <div class="booking-form-container">
+                    <div class="card shadow-sm">
+                        <div class="card-body p-4">
+                            <form id="bookingForm" action="{{ url_for('process_booking') }}" method="POST">
+                                <input type="hidden" name="booking_type" id="bookingType" value="regular">
 
-                        <!-- Location Selection -->
-                        <div class="mb-4">
-                            <label for="location" class="form-label">Lokasi</label>
-                            <select class="form-select" id="location" name="location" required>
-                                <option value="">Pilih Lokasi</option>
-                                {% for location in locations %}
-                                <option value="{{ location.id }}">{{ location.name }}</option>
-                                {% endfor %}
-                            </select>
-                        </div>
+                                <!-- Location Selection -->
+                                <div class="mb-4">
+                                    <label class="form-label fw-bold">
+                                        <i class="fas fa-map-marker-alt text-primary me-2"></i>Lokasi
+                                    </label>
+                                    <select class="form-select form-select-lg" id="location" name="location" required>
+                                        <option value="">Pilih Lokasi</option>
+                                        {% for location in locations %}
+                                        <option value="{{ location.id }}">{{ location.name }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
 
-                        <!-- Date Selection -->
-                        <div class="mb-4">
-                            <label for="date" class="form-label">Tanggal</label>
-                            <input type="date" class="form-control" id="date" name="date" required>
-                        </div>
+                                <!-- Date Selection -->
+                                <div class="mb-4">
+                                    <label class="form-label fw-bold">
+                                        <i class="fas fa-calendar text-primary me-2"></i>Tanggal
+                                    </label>
+                                    <input type="date" class="form-control form-control-lg" id="date" name="date" required>
+                                </div>
 
-                        <!-- Time Slot Selection -->
-                        <div class="mb-4">
-                            <label class="form-label">Pilih Waktu</label>
-                            <div id="timeSlots" class="time-slots">
-                                <!-- Time slots will be populated dynamically -->
-                            </div>
-                        </div>
+                                <!-- Time Slot Selection -->
+                                <div class="mb-4">
+                                    <label class="form-label fw-bold">
+                                        <i class="fas fa-clock text-primary me-2"></i>Pilih Waktu
+                                    </label>
+                                    <div id="timeSlots" class="time-slots-grid">
+                                        <!-- Time slots will be populated dynamically -->
+                                    </div>
+                                </div>
 
-                        <!-- Consecutive Dates Preview (only for regular bookings) -->
-                        <div id="consecutiveDates" class="consecutive-dates mb-4" style="display: none;">
-                            <h4 class="mb-3">Jadwal 4 Minggu Kedepan:</h4>
-                            <div class="consecutive-dates-list">
-                                <!-- Will be populated dynamically -->
-                            </div>
-                        </div>
+                                <!-- Consecutive Dates Preview -->
+                                <div id="consecutiveDates" class="consecutive-dates mb-4" style="display: none;">
+                                    <h5 class="mb-3">
+                                        <i class="fas fa-calendar-week text-primary me-2"></i>
+                                        Jadwal 4 Minggu Kedepan
+                                    </h5>
+                                    <div class="consecutive-dates-list">
+                                        <!-- Will be populated dynamically -->
+                                    </div>
+                                </div>
 
-                        <div class="text-center">
-                            <button type="submit" class="btn btn-primary" id="submitButton" disabled>
-                                Konfirmasi Booking
-                            </button>
+                                <div class="text-center mt-4">
+                                    <button type="submit" class="btn btn-primary btn-lg px-5" id="submitButton" disabled>
+                                        <i class="fas fa-check-circle me-2"></i>Konfirmasi Booking
+                                    </button>
+                                </div>
+                            </form>
                         </div>
-                    </form>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 </section>
 
+<!-- Styles -->
+<style>
+.booking-type-option {
+    cursor: pointer;
+    transition: all 0.3s ease;
+    border: 2px solid transparent;
+}
+
+.booking-type-option:hover {
+    transform: translateY(-5px);
+}
+
+.booking-type-option.active {
+    border-color: var(--bs-primary);
+    background-color: rgba(var(--bs-primary-rgb), 0.05);
+}
+
+.booking-type-icon {
+    height: 60px;
+    width: 60px;
+    border-radius: 50%;
+    background-color: rgba(var(--bs-primary-rgb), 0.1);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 1rem;
+}
+
+.bg-primary-soft {
+    background-color: rgba(var(--bs-primary-rgb), 0.1);
+    color: var(--bs-primary);
+}
+
+.time-slots-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 1rem;
+}
+
+.time-slot-option {
+    position: relative;
+}
+
+.time-slot-option input[type="radio"] {
+    display: none;
+}
+
+.time-slot-option label {
+    display: block;
+    padding: 1rem;
+    border: 2px solid #dee2e6;
+    border-radius: 0.5rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.time-slot-option label:hover {
+    border-color: var(--bs-primary);
+}
+
+.time-slot-option input[type="radio"]:checked + label {
+    border-color: var(--bs-primary);
+    background-color: rgba(var(--bs-primary-rgb), 0.05);
+}
+
+.time-slot-option label.disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    background-color: #f8f9fa;
+}
+
+.availability {
+    display: block;
+    font-size: 0.875rem;
+    color: #6c757d;
+    margin-top: 0.5rem;
+}
+
+.consecutive-dates-list {
+    background-color: #f8f9fa;
+    border-radius: 0.5rem;
+    padding: 1rem;
+}
+
+.date-item {
+    padding: 1rem;
+    margin-bottom: 0.5rem;
+    border-radius: 0.5rem;
+    background-color: white;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.date-item .date {
+    font-weight: bold;
+    color: #333;
+}
+
+.date-item .time {
+    color: #666;
+}
+
+.date-item .quota {
+    font-size: 0.9em;
+    color: #888;
+}
+
+.date-item.available {
+    border-left: 4px solid var(--bs-success);
+}
+
+.date-item.unavailable {
+    border-left: 4px solid var(--bs-danger);
+    opacity: 0.7;
+}
+
+.booking-form-container {
+    animation: slideUp 0.5s ease;
+}
+
+@keyframes slideUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+</style>
+
+<!-- JavaScript -->
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const bookingForm = document.getElementById('bookingForm');
@@ -77,32 +256,11 @@ document.addEventListener('DOMContentLoaded', function() {
     const timeSlotsDiv = document.getElementById('timeSlots');
     const consecutiveDatesDiv = document.getElementById('consecutiveDates');
     const submitButton = document.getElementById('submitButton');
-    const bookingTypeButtons = document.querySelectorAll('[data-booking-type]');
     const bookingTypeInput = document.getElementById('bookingType');
     
     // Set minimum date to today
     const today = new Date().toISOString().split('T')[0];
     dateInput.min = today;
-
-    // Booking type selection
-    bookingTypeButtons.forEach(button => {
-        button.addEventListener('click', function() {
-            // Update active state
-            bookingTypeButtons.forEach(btn => btn.classList.remove('active'));
-            this.classList.add('active');
-            
-            // Update hidden input
-            const bookingType = this.dataset.bookingType;
-            bookingTypeInput.value = bookingType;
-            
-            // Show/hide consecutive dates section
-            consecutiveDatesDiv.style.display = bookingType === 'regular' ? 'block' : 'none';
-            
-            // Reset form
-            submitButton.disabled = true;
-            updateTimeSlots();
-        });
-    });
 
     // Event listeners for form inputs
     locationSelect.addEventListener('change', updateTimeSlots);
@@ -113,9 +271,6 @@ document.addEventListener('DOMContentLoaded', function() {
         const date = dateInput.value;
         const bookingType = bookingTypeInput.value;
         
-        if (bookingType === 'regular') {
-            consecutiveDatesDiv.style.display = 'none';
-        }
         submitButton.disabled = true;
 
         if (locationId && date) {
@@ -131,6 +286,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 timeSlotsDiv.innerHTML = '';
                 data.available_slots.forEach(slot => {
                     const disabled = slot.available <= 0;
+                    const availabilityClass = disabled ? 'text-danger' : 'text-success';
                     timeSlotsDiv.innerHTML += `
                         <div class="time-slot-option">
                             <input type="radio" name="timeSlot" 
@@ -138,8 +294,14 @@ document.addEventListener('DOMContentLoaded', function() {
                                    value="${slot.start_time}-${slot.end_time}"
                                    ${disabled ? 'disabled' : ''}>
                             <label for="slot_${slot.start_time}" class="${disabled ? 'disabled' : ''}">
-                                ${slot.start_time} - ${slot.end_time}
-                                <span class="availability">${slot.available}/${slot.total_quota} tersedia</span>
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <span class="time-range">${slot.start_time} - ${slot.end_time}</span>
+                                    <i class="fas ${disabled ? 'fa-times-circle text-danger' : 'fa-check-circle text-success'}"></i>
+                                </div>
+                                <span class="availability ${availabilityClass}">
+                                    <i class="fas fa-user-friends me-1"></i>
+                                    ${slot.available}/${slot.total_quota} tersedia
+                                </span>
                             </label>
                         </div>
                     `;
@@ -151,7 +313,9 @@ document.addEventListener('DOMContentLoaded', function() {
                         if (bookingTypeInput.value === 'regular') {
                             checkConsecutiveDates();
                         } else {
+                            // For daily bookings, enable submit button immediately if slot is available
                             submitButton.disabled = false;
+                            consecutiveDatesDiv.style.display = 'none';
                         }
                     });
                 });
@@ -160,6 +324,11 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function checkConsecutiveDates() {
+        // Only proceed if booking type is regular
+        if (bookingTypeInput.value !== 'regular') {
+            return;
+        }
+
         const locationId = locationSelect.value;
         const date = dateInput.value;
         const selectedTimeSlot = document.querySelector('input[name="timeSlot"]:checked').value;
@@ -182,9 +351,16 @@ document.addEventListener('DOMContentLoaded', function() {
             data.consecutive_dates.forEach(dateInfo => {
                 datesList.innerHTML += `
                     <div class="date-item ${dateInfo.is_available ? 'available' : 'unavailable'}">
-                        <span class="date">${dateInfo.formatted_date}</span>
-                        <span class="time">${dateInfo.start_time} - ${dateInfo.end_time}</span>
-                        <span class="quota">${dateInfo.available_quota}/${dateInfo.total_quota} tersedia</span>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <span class="date">${dateInfo.formatted_date}</span><br>
+                                <span class="time">${dateInfo.start_time} - ${dateInfo.end_time}</span>
+                            </div>
+                            <div class="quota">
+                                <i class="fas fa-user-friends me-1"></i>
+                                ${dateInfo.available_quota}/${dateInfo.total_quota} tersedia
+                            </div>
+                        </div>
                     </div>
                 `;
                 if (!dateInfo.is_available) {
@@ -227,5 +403,36 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 });
+
+// Function to handle booking type selection
+function selectBookingType(type, element) {
+    // Update hidden input
+    document.getElementById('bookingType').value = type;
+    
+    // Update UI
+    document.querySelectorAll('.booking-type-option').forEach(opt => {
+        opt.classList.remove('active');
+    });
+    element.classList.add('active');
+    
+    // Reset form
+    document.getElementById('submitButton').disabled = true;
+    
+    // Hide consecutive dates for daily bookings
+    const consecutiveDatesDiv = document.getElementById('consecutiveDates');
+    if (type === 'daily') {
+        consecutiveDatesDiv.style.display = 'none';
+    }
+    
+    // Clear time slots
+    document.getElementById('timeSlots').innerHTML = '';
+    
+    // Update time slots if location and date are selected
+    const locationSelect = document.getElementById('location');
+    const dateInput = document.getElementById('date');
+    if (locationSelect.value && dateInput.value) {
+        updateTimeSlots();
+    }
+}
 </script>
-{% endblock %} 
+{% endblock content %}
