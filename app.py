@@ -371,67 +371,46 @@ def book_session():
         date_str = request.form.get('date')
         start_time_str = request.form.get('start_time')
         end_time_str = request.form.get('end_time')
+        booking_type = request.form.get('booking_type')
 
         # Validate input
-        if not all([location_id, date_str, start_time_str, end_time_str]):
+        if not all([location_id, date_str, start_time_str, end_time_str, booking_type]):
             return jsonify({
                 'success': False,
                 'message': 'Semua field harus diisi'
             })
 
-        # Generate a unique group_id (timestamp + user_id)
-        group_id = f"{int(datetime.now().timestamp())}_{session['user_id']}"
+        # Generate a unique group_id for regular bookings
+        group_id = f"{int(datetime.now().timestamp())}_{session['user_id']}" if booking_type == 'regular' else None
 
         # Parse dates and times
-        first_session_date = datetime.strptime(date_str, '%Y-%m-%d')
+        session_date = datetime.strptime(date_str, '%Y-%m-%d')
         start_time = datetime.strptime(start_time_str, '%H:%M').time()
         end_time = datetime.strptime(end_time_str, '%H:%M').time()
 
-        # Create bookings for 4 consecutive weeks
         bookings = []
-        current_date = first_session_date
         
-        for i in range(4):
-            # Check quota availability for each date
-            day_name = calendar.day_name[current_date.weekday()]
-            quota = Quota.query.filter_by(
-                location_id=location_id,
-                day_name=day_name,
-                start_time=start_time,
-                end_time=end_time
-            ).first()
-
-            if not quota:
-                return jsonify({
-                    'success': False,
-                    'message': f'Tidak ada kuota tersedia untuk tanggal {current_date.strftime("%d %B %Y")}'
-                })
-
-            # Count existing bookings
-            existing_bookings = Booking.query.filter_by(
-                location_id=location_id,
-                session_date=current_date,
-                start_time=start_time,
-                end_time=end_time
-            ).count()
-
-            if existing_bookings >= quota.quota:
-                return jsonify({
-                    'success': False,
-                    'message': f'Kuota penuh untuk tanggal {current_date.strftime("%d %B %Y")}'
-                })
-
-            # Create booking with group_id
-            booking = Booking(
-                group_id=group_id,  # Add the group_id
-                location_id=location_id,
-                session_date=current_date,
-                start_time=start_time,
-                end_time=end_time,
-                user_id=session['user_id']
+        if booking_type == 'regular':
+            # Create bookings for 4 consecutive weeks
+            current_date = session_date
+            for i in range(4):
+                booking = create_booking(
+                    location_id, current_date, start_time, end_time,
+                    session['user_id'], group_id
+                )
+                if not booking:
+                    raise Exception(f'Kuota penuh untuk tanggal {current_date.strftime("%d %B %Y")}')
+                bookings.append(booking)
+                current_date += timedelta(days=7)
+        else:
+            # Create single booking for daily/trial
+            booking = create_booking(
+                location_id, session_date, start_time, end_time,
+                session['user_id'], None
             )
+            if not booking:
+                raise Exception('Kuota penuh untuk jadwal yang dipilih')
             bookings.append(booking)
-            current_date += timedelta(days=7)
 
         # Add all bookings to the session
         for booking in bookings:
@@ -451,6 +430,40 @@ def book_session():
             'success': False,
             'message': f'Terjadi kesalahan: {str(e)}'
         })
+
+def create_booking(location_id, session_date, start_time, end_time, user_id, group_id=None):
+    # Check quota availability
+    day_name = calendar.day_name[session_date.weekday()]
+    quota = Quota.query.filter_by(
+        location_id=location_id,
+        day_name=day_name,
+        start_time=start_time,
+        end_time=end_time
+    ).first()
+
+    if not quota:
+        return None
+
+    # Count existing bookings
+    existing_bookings = Booking.query.filter_by(
+        location_id=location_id,
+        session_date=session_date,
+        start_time=start_time,
+        end_time=end_time
+    ).count()
+
+    if existing_bookings >= quota.quota:
+        return None
+
+    # Create booking
+    return Booking(
+        group_id=group_id,
+        location_id=location_id,
+        session_date=session_date,
+        start_time=start_time,
+        end_time=end_time,
+        user_id=user_id
+    )
 
 @app.route('/signup', methods=['GET', 'POST'])
 def signup():

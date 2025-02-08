@@ -5,10 +5,25 @@
     <div class="container">
         <h2 class="text-center mb-5">Pilih Jadwal Latihan</h2>
         
+        <!-- Booking Type Selection -->
+        <div class="row mb-4">
+            <div class="col-lg-8 mx-auto">
+                <div class="booking-type-selector text-center">
+                    <div class="btn-group" role="group">
+                        <button type="button" class="btn btn-outline-primary active" data-booking-type="regular">Regular (4 Minggu)</button>
+                        <button type="button" class="btn btn-outline-primary" data-booking-type="daily">Trial / Harian</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <div class="row">
             <div class="col-lg-8 mx-auto">
                 <div class="booking-form">
                     <form id="bookingForm" action="{{ url_for('process_booking') }}" method="POST">
+                        <!-- Hidden input for booking type -->
+                        <input type="hidden" name="booking_type" id="bookingType" value="regular">
+
                         <!-- Location Selection -->
                         <div class="mb-4">
                             <label for="location" class="form-label">Lokasi</label>
@@ -22,7 +37,7 @@
 
                         <!-- Date Selection -->
                         <div class="mb-4">
-                            <label for="date" class="form-label">Tanggal Mulai</label>
+                            <label for="date" class="form-label">Tanggal</label>
                             <input type="date" class="form-control" id="date" name="date" required>
                         </div>
 
@@ -34,7 +49,7 @@
                             </div>
                         </div>
 
-                        <!-- Consecutive Dates Preview -->
+                        <!-- Consecutive Dates Preview (only for regular bookings) -->
                         <div id="consecutiveDates" class="consecutive-dates mb-4" style="display: none;">
                             <h4 class="mb-3">Jadwal 4 Minggu Kedepan:</h4>
                             <div class="consecutive-dates-list">
@@ -56,23 +71,51 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    const bookingForm = document.getElementById('bookingForm');
     const locationSelect = document.getElementById('location');
     const dateInput = document.getElementById('date');
     const timeSlotsDiv = document.getElementById('timeSlots');
     const consecutiveDatesDiv = document.getElementById('consecutiveDates');
-    const consecutiveDatesList = document.querySelector('.consecutive-dates-list');
     const submitButton = document.getElementById('submitButton');
-    const bookingForm = document.getElementById('bookingForm');
-
+    const bookingTypeButtons = document.querySelectorAll('[data-booking-type]');
+    const bookingTypeInput = document.getElementById('bookingType');
+    
     // Set minimum date to today
     const today = new Date().toISOString().split('T')[0];
     dateInput.min = today;
 
+    // Booking type selection
+    bookingTypeButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            // Update active state
+            bookingTypeButtons.forEach(btn => btn.classList.remove('active'));
+            this.classList.add('active');
+            
+            // Update hidden input
+            const bookingType = this.dataset.bookingType;
+            bookingTypeInput.value = bookingType;
+            
+            // Show/hide consecutive dates section
+            consecutiveDatesDiv.style.display = bookingType === 'regular' ? 'block' : 'none';
+            
+            // Reset form
+            submitButton.disabled = true;
+            updateTimeSlots();
+        });
+    });
+
+    // Event listeners for form inputs
+    locationSelect.addEventListener('change', updateTimeSlots);
+    dateInput.addEventListener('change', updateTimeSlots);
+
     function updateTimeSlots() {
         const locationId = locationSelect.value;
         const date = dateInput.value;
+        const bookingType = bookingTypeInput.value;
         
-        consecutiveDatesDiv.style.display = 'none';
+        if (bookingType === 'regular') {
+            consecutiveDatesDiv.style.display = 'none';
+        }
         submitButton.disabled = true;
 
         if (locationId && date) {
@@ -104,7 +147,13 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 // Add event listeners to new radio buttons
                 document.querySelectorAll('input[name="timeSlot"]').forEach(radio => {
-                    radio.addEventListener('change', checkConsecutiveDates);
+                    radio.addEventListener('change', function() {
+                        if (bookingTypeInput.value === 'regular') {
+                            checkConsecutiveDates();
+                        } else {
+                            submitButton.disabled = false;
+                        }
+                    });
                 });
             });
         }
@@ -113,8 +162,8 @@ document.addEventListener('DOMContentLoaded', function() {
     function checkConsecutiveDates() {
         const locationId = locationSelect.value;
         const date = dateInput.value;
-        const timeSlot = document.querySelector('input[name="timeSlot"]:checked').value;
-        const [startTime, endTime] = timeSlot.split('-');
+        const selectedTimeSlot = document.querySelector('input[name="timeSlot"]:checked').value;
+        const [startTime, endTime] = selectedTimeSlot.split('-');
 
         fetch('/get_consecutive_dates', {
             method: 'POST',
@@ -125,56 +174,43 @@ document.addEventListener('DOMContentLoaded', function() {
         })
         .then(response => response.json())
         .then(data => {
-            consecutiveDatesList.innerHTML = '';
-            let allDatesAvailable = true;
+            consecutiveDatesDiv.style.display = 'block';
+            const datesList = consecutiveDatesDiv.querySelector('.consecutive-dates-list');
+            datesList.innerHTML = '';
 
+            let allDatesAvailable = true;
             data.consecutive_dates.forEach(dateInfo => {
-                const availabilityClass = dateInfo.available_quota > 0 ? 'text-success' : 'text-danger';
-                consecutiveDatesList.innerHTML += `
-                    <div class="consecutive-date-item">
+                datesList.innerHTML += `
+                    <div class="date-item ${dateInfo.is_available ? 'available' : 'unavailable'}">
                         <span class="date">${dateInfo.formatted_date}</span>
                         <span class="time">${dateInfo.start_time} - ${dateInfo.end_time}</span>
-                        <span class="quota ${availabilityClass}">
-                            ${dateInfo.available_quota}/${dateInfo.total_quota} tersedia
-                        </span>
+                        <span class="quota">${dateInfo.available_quota}/${dateInfo.total_quota} tersedia</span>
                     </div>
                 `;
-                if (dateInfo.available_quota <= 0) {
+                if (!dateInfo.is_available) {
                     allDatesAvailable = false;
                 }
             });
 
-            consecutiveDatesDiv.style.display = 'block';
             submitButton.disabled = !allDatesAvailable;
-
-            if (!allDatesAvailable) {
-                alert('Beberapa jadwal tidak tersedia. Silakan pilih waktu lain.');
-            }
         });
     }
-
-    locationSelect.addEventListener('change', updateTimeSlots);
-    dateInput.addEventListener('change', updateTimeSlots);
 
     bookingForm.addEventListener('submit', function(e) {
         e.preventDefault();
         
-        // Get the selected time slot
         const selectedTimeSlot = document.querySelector('input[name="timeSlot"]:checked').value;
         const [startTime, endTime] = selectedTimeSlot.split('-');
         
-        // Create FormData object
         const formData = new FormData();
         formData.append('location_id', locationSelect.value);
         formData.append('date', dateInput.value);
         formData.append('start_time', startTime);
         formData.append('end_time', endTime);
+        formData.append('booking_type', bookingTypeInput.value);
 
         fetch('/book_session', {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded',
-            },
             body: new URLSearchParams(formData)
         })
         .then(response => response.json())

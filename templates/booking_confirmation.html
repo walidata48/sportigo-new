@@ -1,96 +1,87 @@
 {% extends "base.html" %}
 
 {% block content %}
-<section class="confirmation-section py-5">
-    <div class="container">
-        <div class="confirmation-card">
-            <div class="text-center mb-4">
-                <i class="fas fa-check-circle confirmation-icon"></i>
-                <h2 class="mt-3">Booking Berhasil!</h2>
-                <p class="lead">{{ location.name }}</p>
-            </div>
-
-            <div class="booking-details">
-                <h4 class="mb-3">Detail Jadwal Latihan Anda:</h4>
-                <div class="table-responsive">
-                    <table class="table booking-table">
-                        <thead>
-                            <tr>
-                                
-                                <th>Tanggal</th>
-                                <th>Waktu</th>
-                                
-                                <th>Status</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for booking in bookings %}
-                            <tr>
-                                
-                                <td>{{ booking.session_date.strftime('%d %B %Y') }}</td>
-                                <td>{{ booking.start_time.strftime('%H:%M') }} - {{ booking.end_time.strftime('%H:%M') }}</td>
-                                
-                                <td>
-                                    <span class="badge {% if booking.payment_status == 'paid' %}bg-success{% else %}bg-warning{% endif %}">
-                                        {% if booking.payment_status == 'paid' %}
-                                            Sudah Bayar
-                                        {% else %}
-                                            Menunggu Pembayaran
-                                        {% endif %}
-                                    </span>
-                                </td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-
-                <div class="payment-summary mt-4">
-                    <h4 class="mb-3">Ringkasan Pembayaran</h4>
-                    <div class="card">
-                        <div class="card-body">
-                            <div class="d-flex justify-content-between mb-3">
-                                <span>Paket Bulanan (4 sesi)</span>
-                                <span>Rp {{ "{:,.0f}".format(location.monthly_price) }}</span>
-                            </div>
-                            <div class="small text-muted mb-3">
-                                <i class="fas fa-info-circle"></i> Harga per sesi: Rp {{ "{:,.0f}".format(location.monthly_price / 4) }}
-                                <br>
-                                <i class="fas fa-check"></i> Hemat Rp {{ "{:,.0f}".format((location.daily_price * 4) - location.monthly_price) }} dibanding harga harian
-                            </div>
-
-                            <!-- Add coupon code form -->
-                            <div class="coupon-section mb-3">
-                                <div class="input-group">
-                                    <input type="text" id="couponCode" class="form-control" placeholder="Kode Kupon">
-                                    <button class="btn btn-outline-secondary" type="button" onclick="applyCoupon()">Terapkan</button>
+<div class="container py-5">
+    <div class="row">
+        <div class="col-lg-8 mx-auto">
+            <div class="card">
+                <div class="card-body">
+                    <h2 class="card-title text-center mb-4">Konfirmasi Booking</h2>
+                    
+                    <div class="booking-details mb-4">
+                        <h4>Detail Booking:</h4>
+                        <p><strong>Lokasi:</strong> {{ location.name }}</p>
+                        
+                        {% if bookings|length > 1 %}
+                            <!-- Regular booking (4 weeks) -->
+                            <p><strong>Jenis Booking:</strong> Regular (4 Minggu)</p>
+                            <div class="sessions-list">
+                                <h5>Jadwal Sesi:</h5>
+                                {% for booking in bookings %}
+                                <div class="session-item">
+                                    <p>{{ booking.session_date.strftime('%d %B %Y') }}<br>
+                                       {{ booking.start_time.strftime('%H:%M') }} - {{ booking.end_time.strftime('%H:%M') }}</p>
                                 </div>
-                                <div id="couponMessage" class="small mt-1"></div>
+                                {% endfor %}
                             </div>
+                            <p><strong>Total Pembayaran:</strong> Rp {{ (location.monthly_price) }}</p>
+                        {% else %}
+                            <!-- Daily/Trial booking -->
+                            <p><strong>Jenis Booking:</strong> Harian</p>
+                            <p><strong>Tanggal:</strong> {{ bookings[0].session_date.strftime('%d %B %Y') }}</p>
+                            <p><strong>Waktu:</strong> {{ bookings[0].start_time.strftime('%H:%M') }} - {{ bookings[0].end_time.strftime('%H:%M') }}</p>
+                            <p><strong>Total Pembayaran:</strong> Rp {{ (location.daily_price) }}</p>
+                        {% endif %}
+                    </div>
 
-                            <hr>
-                            <div class="d-flex justify-content-between fw-bold">
-                                <span>Total Pembayaran</span>
-                                <span id="totalPayment">Rp {{ "{:,.0f}".format(location.monthly_price) }}</span>
+                    <!-- Payment section -->
+                    <div class="payment-section">
+                        <h4 class="mb-3">Ringkasan Pembayaran</h4>
+                        <div class="card">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between mb-3">
+                                    <span>Paket Bulanan (4 sesi)</span>
+                                    <span>Rp {{ "{:,.0f}".format(location.monthly_price) }}</span>
+                                </div>
+                                <div class="small text-muted mb-3">
+                                    <i class="fas fa-info-circle"></i> Harga per sesi: Rp {{ "{:,.0f}".format(location.monthly_price / 4) }}
+                                    <br>
+                                    <i class="fas fa-check"></i> Hemat Rp {{ "{:,.0f}".format((location.daily_price * 4) - location.monthly_price) }} dibanding harga harian
+                                </div>
+
+                                <!-- Add coupon code form -->
+                                <div class="coupon-section mb-3">
+                                    <div class="input-group">
+                                        <input type="text" id="couponCode" class="form-control" placeholder="Kode Kupon">
+                                        <button class="btn btn-outline-secondary" type="button" onclick="applyCoupon()">Terapkan</button>
+                                    </div>
+                                    <div id="couponMessage" class="small mt-1"></div>
+                                </div>
+
+                                <hr>
+                                <div class="d-flex justify-content-between fw-bold">
+                                    <span>Total Pembayaran</span>
+                                    <span id="totalPayment">Rp {{ "{:,.0f}".format(location.monthly_price) }}</span>
+                                </div>
                             </div>
                         </div>
                     </div>
-                </div>
 
-                <div class="text-center mt-4">
-                    {% if bookings[0].payment_status != 'paid' %}
-                    <button class="btn btn-primary btn-lg me-2" onclick="proceedToPayment('{{ bookings[0].id }}', '{{location.monthly_price}}', '{{location.name}}')">
-                        <i class="fas fa-credit-card me-2"></i>Lanjutkan ke Pembayaran
-                    </button>
-                    {% endif %}
-                    <button class="btn btn-danger btn-lg mt-4" onclick="cancelBookings('{{ bookings[0].id }}')">
-                        <i class="fas fa-times me-2"></i>Batalkan Semua Jadwal
-                    </button>
+                    <div class="text-center mt-4">
+                        {% if bookings[0].payment_status != 'paid' %}
+                        <button class="btn btn-primary btn-lg me-2" onclick="proceedToPayment('{{ bookings[0].id }}', '{{location.monthly_price}}', '{{location.name}}')">
+                            <i class="fas fa-credit-card me-2"></i>Lanjutkan ke Pembayaran
+                        </button>
+                        {% endif %}
+                        <button class="btn btn-danger btn-lg mt-4" onclick="cancelBookings('{{ bookings[0].id }}')">
+                            <i class="fas fa-times me-2"></i>Batalkan Semua Jadwal
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
-</section>
+</div>
 <script src="https://app.sandbox.midtrans.com/snap/snap.js" data-client-key="SB-Mid-client-_2sU7mKfWAXz2N4S"></script>
 <script>
 async function proceedToPayment(bookingId, grossAmount, itemName) {
