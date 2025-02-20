@@ -47,7 +47,7 @@
                             </li>
                         {% endif %}
                         <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('my_notifications') }}">
+                            <a class="nav-link" href="{{ url_for('notifications') }}">
                                 Notifications
                                 {% if payment_notifications_count > 0 %}
                                     <span class="badge bg-danger">{{ payment_notifications_count }}</span>

@@ -245,6 +245,48 @@
     </div>
 </div>
 
+<!-- Add this section after the regular swimming school bookings -->
+<div class="card mt-4">
+    <div class="card-header">
+        <h5 class="mb-0">KCC Swimming Sessions Today</h5>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>Time</th>
+                        <th>Student</th>
+                        <th>Package</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for session in kcc_sessions %}
+                    <tr>
+                        <td>{{ session.start_time.strftime('%H:%M') }} - {{ session.end_time.strftime('%H:%M') }}</td>
+                        <td>{{ session.booking.user.username }}</td>
+                        <td>{{ session.booking.package.package_name }}</td>
+                        <td>
+                            <span class="badge bg-{{ session.status | status_color }}">
+                                {{ session.status | title }}
+                            </span>
+                        </td>
+                        <td>
+                            <a href="{{ url_for('admin_kcc_attendance') }}?date={{ selected_date }}" 
+                               class="btn btn-sm btn-primary">
+                                Manage Attendance
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
 <style>
 .card {
     border: none;

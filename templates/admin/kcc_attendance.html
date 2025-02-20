@@ -1,0 +1,119 @@
+{% extends "admin/base.html" %}
+
+{% block content %}
+<div class="container py-4">
+    <h2 class="mb-4">KCC Swimming Attendance</h2>
+    
+    <!-- Date Filter -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <form method="GET" class="row g-3 align-items-center">
+                <div class="col-auto">
+                    <label class="form-label">Select Date:</label>
+                    <input type="date" name="date" class="form-control" 
+                           value="{{ selected_date }}" onchange="this.form.submit()">
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Attendance Table -->
+    <div class="card">
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Time</th>
+                            <th>Student Name</th>
+                            <th>Package</th>
+                            <th>Status</th>
+                            <th>Notes</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for session in sessions %}
+                        <tr data-session-id="{{ session.id }}">
+                            <td>{{ session.start_time.strftime('%H:%M') }} - {{ session.end_time.strftime('%H:%M') }}</td>
+                            <td>{{ session.booking.user.username }}</td>
+                            <td>{{ session.booking.package.package_name }}</td>
+                            <td>
+                                <select class="form-select status-select" style="width: auto;">
+                                    <option value="scheduled" {% if session.status == 'scheduled' %}selected{% endif %}>Scheduled</option>
+                                    <option value="present" {% if session.status == 'present' %}selected{% endif %}>Present</option>
+                                    <option value="absent" {% if session.status == 'absent' %}selected{% endif %}>Absent</option>
+                                </select>
+                            </td>
+                            <td>
+                                <input type="text" class="form-control notes-input" 
+                                       value="{{ session.notes or '' }}" placeholder="Add notes">
+                            </td>
+                            <td>
+                                <button class="btn btn-sm btn-primary save-btn" style="display: none;">
+                                    Save
+                                </button>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const rows = document.querySelectorAll('tr[data-session-id]');
+    
+    rows.forEach(row => {
+        const sessionId = row.dataset.sessionId;
+        const statusSelect = row.querySelector('.status-select');
+        const notesInput = row.querySelector('.notes-input');
+        const saveBtn = row.querySelector('.save-btn');
+        
+        // Show save button when changes are made
+        [statusSelect, notesInput].forEach(element => {
+            element.addEventListener('change', () => {
+                saveBtn.style.display = 'inline-block';
+            });
+        });
+        
+        notesInput.addEventListener('input', () => {
+            saveBtn.style.display = 'inline-block';
+        });
+        
+        // Handle save button click
+        saveBtn.addEventListener('click', async () => {
+            try {
+                const response = await fetch('/update_kcc_presence_batch', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        updates: [{
+                            session_id: sessionId,
+                            status: statusSelect.value,
+                            notes: notesInput.value
+                        }]
+                    })
+                });
+                
+                const data = await response.json();
+                if (data.success) {
+                    saveBtn.style.display = 'none';
+                    // Optional: Show success message
+                } else {
+                    alert('Error updating attendance: ' + data.error);
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Error updating attendance');
+            }
+        });
+    });
+});
+</script>
+{% endblock %} 

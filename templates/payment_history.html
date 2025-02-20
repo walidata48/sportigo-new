@@ -61,12 +61,12 @@
                                         <td>
                                             {% if payment.status in ['pending', 'overdue'] and payment.is_active %}
                                                 <button class="btn btn-primary btn-sm"
-                                                        onclick="processPayment('{{ payment.booking_id }}')">
+                                                        onclick="processPayment('{{ payment.booking_id }}', '{{ payment.type }}')">
                                                     Pay Now
                                                 </button>
                                             {% elif payment.status == 'paid' %}
                                                 <button class="btn btn-outline-secondary btn-sm" 
-                                                        onclick="viewReceipt('{{ payment.booking_id }}', '{{ payment.payment_date }}')">
+                                                        onclick="viewReceipt('{{ payment.booking_id }}', '{{ payment.payment_date }}', '{{ payment.type }}')">
                                                     View Receipt
                                                 </button>
                                             {% endif %}
@@ -106,13 +106,14 @@ function filterPayments(status) {
     event.target.classList.add('active');
 }
 
-function processPayment(bookingId) {
+function processPayment(bookingId, type) {
     if (confirm('Proceed with payment?')) {
-        window.location.href = `/asa/booking_confirmation/${bookingId}`;
+        const baseUrl = type === 'asa' ? '/asa/booking_confirmation/' : '/kcc/payment/transfer/';
+        window.location.href = baseUrl + bookingId;
     }
 }
 
-function viewReceipt(bookingId, paymentDate) {
+function viewReceipt(bookingId, paymentDate, type) {
     // Implement receipt view functionality
     alert('Receipt viewer to be implemented');
 }

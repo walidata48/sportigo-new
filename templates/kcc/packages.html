@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="kcc-packages py-5">
+    <div class="container">
+        <div class="text-center mb-5">
+            <h2 class="display-4">KCC Swimming Pool</h2>
+            <p class="lead text-muted">Choose your preferred swimming package</p>
+        </div>
+        
+        <div class="pricing-grid">
+            {% for package in packages %}
+            <div class="pricing-card {% if package.is_trial %}trial{% endif %}">
+                {% if package.is_trial %}
+                <div class="trial-badge">Trial</div>
+                {% endif %}
+                
+                <div class="pricing-header">
+                    <h3 class="plan-name">{{ package.package_name }}</h3>
+                </div>
+
+                <div class="pricing-body">
+                    <div class="description text-muted mb-4">{{ package.description }}</div>
+                    <div class="schedules">
+                        <h4 class="schedule-title">Available Schedule:</h4>
+                        <ul class="schedule-list">
+                            {% for schedule in package.schedules %}
+                            <li>
+                                <i class="far fa-clock"></i>
+                                <span class="day">{{ schedule.day_name }}</span>
+                                <span class="time">
+                                    {{ schedule.start_time.strftime('%H:%M') }} - 
+                                    {{ schedule.end_time.strftime('%H:%M') }}
+                                </span>
+                            </li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="pricing-footer">
+                    <form action="{{ url_for('kcc_book', package_id=package.id) }}" method="POST">
+                        <button type="submit" class="btn-choose {% if package.is_trial %}trial{% endif %}">
+                            {% if package.is_trial %}
+                            Book Trial
+                            {% else %}
+                            Select Package
+                            {% endif %}
+                        </button>
+                    </form>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</section>
+
+<!-- Include the same styles as ASA packages -->
+{% include "kcc/package_styles.html" %}
+{% endblock %} 

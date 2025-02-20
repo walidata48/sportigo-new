@@ -45,7 +45,7 @@
                                     
                                     <div>
                                         <button class="btn btn-primary" 
-                                                onclick="processPayment('{{ notification.booking_id }}')">
+                                                onclick="processPayment('{{ notification.booking_id }}', '{{ notification.type }}')">
                                             Pay Now
                                         </button>
                                     </div>
@@ -91,10 +91,11 @@
 </div>
 
 <script>
-function processPayment(bookingId) {
+function processPayment(bookingId, type) {
     if (confirm('Proceed with payment?')) {
-        // Redirect to payment page
-        window.location.href = `/asa/booking_confirmation/${bookingId}`;
+        // Redirect to appropriate payment page based on type
+        const baseUrl = type === 'asa' ? '/asa/booking_confirmation/' : '/kcc/payment/transfer/';
+        window.location.href = baseUrl + bookingId;
     }
 }
 </script>

@@ -44,6 +44,16 @@ def translate_day(day_name):
 
 app.jinja_env.filters['translate_day'] = translate_day
 
+@app.template_filter('status_color')
+def status_color(status):
+    colors = {
+        'scheduled': 'secondary',
+        'present': 'success',
+        'absent': 'danger',
+        'cancelled': 'warning'
+    }
+    return colors.get(status, 'secondary')
+
 # Models
 class Location(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -165,6 +175,55 @@ class Pool(db.Model):
     contact_info = db.Column(db.String(255))
     is_active = db.Column(db.Boolean, default=True)
 
+class KCCPool(db.Model):
+    __tablename__ = 'kcc_packages'
+    id = db.Column(db.Integer, primary_key=True)
+    package_name = db.Column(db.String(100), nullable=False)
+    price = db.Column(db.Integer, nullable=False)
+    description = db.Column(db.Text, nullable=True)
+    sessions_per_month = db.Column(db.Integer, default=12)
+    is_trial = db.Column(db.Boolean, default=False)
+
+class KCCSchedule(db.Model):
+    __tablename__ = 'kcc_schedules'
+    id = db.Column(db.Integer, primary_key=True)
+    package_id = db.Column(db.Integer, db.ForeignKey('kcc_packages.id'), nullable=False)
+    day_name = db.Column(db.String(10), nullable=False)
+    start_time = db.Column(db.Time, nullable=False)
+    end_time = db.Column(db.Time, nullable=False)
+    quota = db.Column(db.Integer, default=20)
+    
+    package = db.relationship('KCCPool', backref='schedules')
+
+class KCCBooking(db.Model):
+    __tablename__ = 'kcc_bookings'
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    package_id = db.Column(db.Integer, db.ForeignKey('kcc_packages.id'), nullable=False)
+    booking_date = db.Column(db.DateTime, default=datetime.utcnow)
+    payment_status = db.Column(db.String(20), default='pending')
+    applied_discount = db.Column(db.Integer, default=0)
+    recurring_payment_date = db.Column(db.Integer)
+    next_payment_date = db.Column(db.Date)
+    is_active = db.Column(db.Boolean, default=True)
+    
+    package = db.relationship('KCCPool', backref='bookings')
+    user = db.relationship('User', backref='kcc_bookings')
+    sessions = db.relationship('KCCBookingSession', backref='booking')
+
+class KCCBookingSession(db.Model):
+    __tablename__ = 'kcc_booking_sessions'
+    id = db.Column(db.Integer, primary_key=True)
+    booking_id = db.Column(db.Integer, db.ForeignKey('kcc_bookings.id'), nullable=False)
+    schedule_id = db.Column(db.Integer, db.ForeignKey('kcc_schedules.id'), nullable=False)
+    session_date = db.Column(db.Date, nullable=False)
+    start_time = db.Column(db.Time, nullable=False)
+    end_time = db.Column(db.Time, nullable=False)
+    status = db.Column(db.String(20), default='scheduled')
+    notes = db.Column(db.Text, nullable=True)
+    
+    schedule = db.relationship('KCCSchedule')
+
 def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
@@ -186,10 +245,42 @@ def admin_required(f):
     return decorated_function
 
 @app.before_request
-def load_user():
+def before_request():
     g.user = None
     if 'user_id' in session:
         g.user = User.query.get(session['user_id'])
+        
+        # Calculate payment notifications count
+        if g.user:
+            today = datetime.now().date()
+            notifications_count = 0
+            
+            # Count ASA notifications
+            asa_notifications = ASABooking.query.filter(
+                ASABooking.user_id == g.user.id,
+                ASABooking.is_active == True,
+                ASABooking.next_payment_date != None,
+                ASABooking.next_payment_date <= (today + timedelta(days=3))
+            ).count()
+            
+            # Count KCC notifications
+            kcc_notifications = KCCBooking.query.filter(
+                KCCBooking.user_id == g.user.id,
+                KCCBooking.is_active == True,
+                KCCBooking.next_payment_date != None,
+                KCCBooking.next_payment_date <= (today + timedelta(days=3))
+            ).count()
+            
+            g.payment_notifications_count = asa_notifications + kcc_notifications
+
+@app.context_processor
+def utility_processor():
+    def get_payment_notifications_count():
+        return getattr(g, 'payment_notifications_count', 0)
+    
+    return {
+        'payment_notifications_count': get_payment_notifications_count()
+    }
 
 @app.route('/')
 def index():
@@ -913,7 +1004,7 @@ def schedule_attendance_sessions(booking_id, start_date):
     """Create attendance sessions for the next month"""
     booking = ASABooking.query.get(booking_id)
     end_date = (start_date.replace(day=1) + timedelta(days=32)).replace(day=start_date.day)
-    
+
     # Get all dates that are Tuesday, Thursday, or Saturday between start_date and end_date
     current_date = start_date
     while current_date < end_date:
@@ -1168,45 +1259,21 @@ def admin_dashboard():
     else:
         selected_date = datetime.now().date()
 
-    # Base query
-    bookings_query = Booking.query.filter(Booking.session_date == selected_date)
+    # Get KCC bookings for today
+    kcc_sessions = KCCBookingSession.query\
+        .filter(KCCBookingSession.session_date == selected_date)\
+        .order_by(KCCBookingSession.start_time)\
+        .all()
 
-    # Apply filters
-    if selected_location:
-        bookings_query = bookings_query.filter(Booking.location_id == selected_location)
-    if selected_time:
-        bookings_query = bookings_query.filter(
-            Booking.start_time == datetime.strptime(selected_time, '%H:%M').time()
-        )
-
-    # Get filtered bookings
-    daily_bookings = bookings_query.order_by(
-        Booking.start_time,
-        Booking.location_id
-    ).all()
-
-    # Calculate bookings count
-    bookings_count = {}
-    for booking in daily_bookings:
-        key = (booking.location_id, booking.start_time.strftime('%H:%M'))
-        bookings_count[key] = bookings_count.get(key, 0) + 1
-
-    # Get available times for filter
-    available_times = db.session.query(distinct(Booking.start_time)).\
-        order_by(Booking.start_time).\
-        all()
-    available_times = [time[0].strftime('%H:%M') for time in available_times]
-
-    return render_template('admin/dashboard.html',
-                         selected_date=selected_date,
-                         selected_location=selected_location,
-                         selected_time=selected_time,
-                         daily_bookings=daily_bookings,
-                         bookings_count=bookings_count,
-                         locations=Location.query.all(),
-                         available_times=available_times,
-                         asa_bookings=ASABooking.query.all(),
-                         asa_schedules=ASASchedule.query.all())
+    return render_template(
+        'admin/dashboard.html',
+        selected_date=selected_date,
+        selected_location=selected_location,
+        selected_time=selected_time,
+        kcc_sessions=kcc_sessions,
+        locations=Location.query.all(),
+        available_times=get_available_times()
+    )
 
 @app.route('/update_presence_batch', methods=['POST'])
 @admin_required
@@ -1525,120 +1592,129 @@ def update_asa_presence_batch():
         db.session.rollback()
         return jsonify({'success': False, 'error': str(e)})
 
-@app.route('/my_notifications')
+@app.route('/notifications')
 @login_required
-def my_notifications():
+def notifications():
     today = datetime.now().date()
+    payment_notifications = []
     
-    # Get all active ASA bookings for the user
-    asa_bookings = ASABooking.query.filter(
-        ASABooking.user_id == session['user_id'],
-        ASABooking.is_active == True
+    # Get ASA notifications
+    asa_bookings = ASABooking.query.filter_by(
+        user_id=session['user_id'],
+        is_active=True
     ).all()
     
-    # Prepare notifications data
-    payment_notifications = []
+    # Get KCC notifications
+    kcc_bookings = KCCBooking.query.filter_by(
+        user_id=session['user_id'],
+        is_active=True
+    ).all()
+    
+    # Process ASA bookings
     for booking in asa_bookings:
         if booking.next_payment_date:
             days_until_payment = (booking.next_payment_date - today).days
-            status = 'upcoming'
-            if days_until_payment <= 3:
+            status = 'normal'
+            if days_until_payment <= 3 and days_until_payment >= 0:
                 status = 'urgent'
             elif days_until_payment < 0:
                 status = 'overdue'
                 
             payment_notifications.append({
                 'booking_id': booking.id,
-                'package_name': booking.package.package_name,
+                'package_name': f"ASA - {booking.package.package_name}",
                 'payment_date': booking.next_payment_date,
-                'days_until_payment': days_until_payment,
                 'amount': booking.package.price,
-                'status': status
+                'days_until_payment': days_until_payment,
+                'status': status,
+                'type': 'asa'
             })
     
-    return render_template(
-        'notifications.html',
-        payment_notifications=payment_notifications,
-        today=today
-    )
-
-@app.context_processor
-def inject_notification_count():
-    if 'user_id' in session:
-        today = datetime.now().date()
-        # Count notifications for payments due within 3 days or overdue
-        payment_notifications_count = ASABooking.query.filter(
-            ASABooking.user_id == session['user_id'],
-            ASABooking.is_active == True,
-            ASABooking.next_payment_date <= today + timedelta(days=3)
-        ).count()
-        return {'payment_notifications_count': payment_notifications_count}
-    return {'payment_notifications_count': 0}
+    # Process KCC bookings
+    for booking in kcc_bookings:
+        if booking.next_payment_date:
+            days_until_payment = (booking.next_payment_date - today).days
+            status = 'normal'
+            if days_until_payment <= 3 and days_until_payment >= 0:
+                status = 'urgent'
+            elif days_until_payment < 0:
+                status = 'overdue'
+                
+            payment_notifications.append({
+                'booking_id': booking.id,
+                'package_name': f"KCC - {booking.package.package_name}",
+                'payment_date': booking.next_payment_date,
+                'amount': booking.package.price,
+                'days_until_payment': days_until_payment,
+                'status': status,
+                'type': 'kcc'
+            })
+    
+    # Sort notifications by payment date
+    payment_notifications.sort(key=lambda x: x['payment_date'])
+    
+    return render_template('notifications.html',
+                         payment_notifications=payment_notifications,
+                         today=today)
 
 @app.route('/payment_history')
 @login_required
 def payment_history():
-    # Get all ASA bookings for the user
+    today = datetime.now().date()
+    payment_history = []
+    
+    # Get ASA payment history
     asa_bookings = ASABooking.query.filter_by(
         user_id=session['user_id']
-    ).order_by(
-        ASABooking.booking_date.desc()
     ).all()
     
-    # Prepare payment history data
-    payment_history = []
+    # Get KCC payment history
+    kcc_bookings = KCCBooking.query.filter_by(
+        user_id=session['user_id']
+    ).all()
+    
+    # Process ASA bookings
     for booking in asa_bookings:
-        # Skip if booking_date is None
-        if not booking.booking_date:
-            continue
+        if booking.next_payment_date:
+            status = 'paid' if booking.payment_status == 'paid' else (
+                'overdue' if booking.next_payment_date < today else 'pending'
+            )
             
-        # Calculate all monthly payments up to current date
-        payment_date = booking.booking_date.date()
-        today = datetime.now().date()
-        
-        while payment_date <= today:
-            payment_status = 'paid'
-            
-            # Check if next_payment_date exists before comparison
-            if booking.next_payment_date:
-                if payment_date == booking.next_payment_date:
-                    payment_status = 'pending'
-                elif payment_date > booking.next_payment_date:
-                    payment_status = 'overdue'
-                
-            # Calculate period (month and year this payment is for)
-            period_start = payment_date
-            period_end = (period_start.replace(day=1) + timedelta(days=32)).replace(day=1) - timedelta(days=1)
-                
             payment_history.append({
                 'booking_id': booking.id,
-                'package_name': booking.package.package_name,
-                'payment_date': payment_date,
-                'period': f"{period_start.strftime('%B %Y')}",  # e.g., "November 2023"
-                'period_start': period_start,
-                'period_end': period_end,
-                'amount': booking.package.price - (booking.applied_discount or 0),
-                'status': payment_status,
-                'is_active': booking.is_active
+                'package_name': f"ASA - {booking.package.package_name}",
+                'payment_date': booking.next_payment_date,
+                'period': booking.next_payment_date.strftime('%B %Y'),
+                'amount': booking.package.price,
+                'status': status,
+                'is_active': booking.is_active,
+                'type': 'asa'
             })
-            
-            # Move to next month
-            try:
-                payment_date = (payment_date.replace(day=1) + timedelta(days=32)).replace(
-                    day=booking.recurring_payment_date or payment_date.day
-                )
-            except ValueError:
-                # Handle case where the day doesn't exist in the next month
-                next_month = payment_date.replace(day=1) + timedelta(days=32)
-                payment_date = next_month.replace(day=1)
     
-    # Sort by payment date, most recent first
+    # Process KCC bookings
+    for booking in kcc_bookings:
+        if booking.next_payment_date:
+            status = 'paid' if booking.payment_status == 'paid' else (
+                'overdue' if booking.next_payment_date < today else 'pending'
+            )
+            
+            payment_history.append({
+                'booking_id': booking.id,
+                'package_name': f"KCC - {booking.package.package_name}",
+                'payment_date': booking.next_payment_date,
+                'period': booking.next_payment_date.strftime('%B %Y'),
+                'amount': booking.package.price,
+                'status': status,
+                'is_active': booking.is_active,
+                'type': 'kcc'
+            })
+    
+    # Sort payment history by payment date (newest first)
     payment_history.sort(key=lambda x: x['payment_date'], reverse=True)
     
-    return render_template(
-        'payment_history.html',
-        payment_history=payment_history
-    )
+    return render_template('payment_history.html',
+                         payment_history=payment_history,
+                         today=today)
 
 @app.route('/admin/coupons', methods=['GET', 'POST'])
 @admin_required
@@ -1733,9 +1809,7 @@ def search_users():
             or_(
                 User.username.ilike(f'%{query}%'),
                 User.email.ilike(f'%{query}%')
-            )
-        )
-
+            ))
     # Get paginated results
     users = users_query.paginate(page=page, per_page=per_page, error_out=False)
 
@@ -1779,6 +1853,207 @@ def pool_profile(pool_id):
                          gallery=gallery,
                          features=features,
                          opening_hours=opening_hours)
+
+# Add KCC routes
+@app.route('/kcc')
+def kcc_packages():
+    packages = KCCPool.query.all()
+    return render_template('kcc/packages.html', packages=packages)
+
+@app.route('/kcc/book/<int:package_id>', methods=['POST'])
+@login_required
+def kcc_book(package_id):
+    package = KCCPool.query.get_or_404(package_id)
+    
+    booking = KCCBooking(
+        user_id=session['user_id'],
+        package_id=package_id,
+        payment_status='pending'
+    )
+    db.session.add(booking)
+    
+    try:
+        db.session.commit()
+        return redirect(url_for('kcc_payment_transfer', booking_id=booking.id))
+    except Exception as e:
+        db.session.rollback()
+        flash('An error occurred while processing your booking. Please try again.', 'error')
+        return redirect(url_for('kcc_packages'))
+
+@app.route('/kcc/payment/transfer/<int:booking_id>')
+@login_required
+def kcc_payment_transfer(booking_id):
+    booking = KCCBooking.query.get_or_404(booking_id)
+    package = KCCPool.query.get(booking.package_id)
+    
+    # Check if registration is after the 10th
+    today = datetime.now().date()
+    is_prorated = today.day > 10
+    
+    return render_template(
+        'kcc/payment_transfer.html',
+        booking=booking,
+        package=package,
+        is_prorated=is_prorated
+    )
+
+@app.route('/apply_kcc_coupon', methods=['POST'])
+@login_required
+def apply_kcc_coupon():
+    coupon_code = request.form.get('coupon_code')
+    package_price = request.form.get('package_price', type=int)
+    
+    # Query for either user-specific coupon or general coupon
+    coupon = Coupon.query.filter(
+        Coupon.code == coupon_code,
+        Coupon.is_active == True,
+        db.or_(
+            Coupon.user_id == session['user_id'],  # User-specific coupon
+            Coupon.user_id == None  # General coupon
+        )
+    ).first()
+    
+    if not coupon:
+        return jsonify({
+            'success': False,
+            'message': 'Kode kupon tidak valid'
+        })
+    
+    if coupon.valid_until and coupon.valid_until < datetime.now().date():
+        return jsonify({
+            'success': False,
+            'message': 'Kupon sudah kadaluarsa'
+        })
+
+    if coupon.discount_amount > package_price:
+        return jsonify({
+            'success': False,
+            'message': 'Nilai kupon melebihi harga paket'
+        })
+    
+    return jsonify({
+        'success': True,
+        'discount_amount': coupon.discount_amount,
+        'message': f'Kupon berhasil diterapkan! Diskon Rp {coupon.discount_amount:,}'
+    })
+
+@app.route('/update_kcc_payment_status', methods=['POST'])
+@login_required
+def update_kcc_payment_status():
+    try:
+        booking_id = request.form.get('booking_id')
+        applied_discount = int(request.form.get('applied_discount', 0))
+        
+        booking = KCCBooking.query.get_or_404(booking_id)
+        
+        # Update booking with applied discount
+        booking.applied_discount = applied_discount
+        
+        # Calculate next payment date (1st of next month)
+        today = datetime.now().date()
+        if today.day > 10:  # If after 10th, set next payment to month after next
+            next_month = today.replace(day=1) + timedelta(days=32)
+            booking.next_payment_date = next_month.replace(day=1)
+        else:  # If before 10th, set next payment to 1st of next month
+            next_month = today.replace(day=1) + timedelta(days=32)
+            booking.next_payment_date = next_month.replace(day=1)
+        
+        # Set recurring payment date
+        booking.recurring_payment_date = 1  # Always 1st of the month
+        booking.is_active = True  # Activate the booking
+        
+        # Create booking sessions
+        create_kcc_booking_sessions(booking.id)
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Payment status updated successfully'
+        })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            'success': False,
+            'message': str(e)
+        })
+
+def create_kcc_booking_sessions(booking_id):
+    booking = KCCBooking.query.get(booking_id)
+    
+    # Calculate start and end dates
+    today = datetime.now().date()
+    if today.day > 10:  # If after 10th, start from next month
+        start_date = (today.replace(day=1) + timedelta(days=32)).replace(day=1)
+    else:  # If before 10th, start from current month
+        start_date = today.replace(day=1)
+    
+    # End date is the last day of the month
+    end_date = (start_date.replace(day=1) + timedelta(days=32)).replace(day=1)
+    
+    # Create sessions for each available day
+    current_date = start_date
+    while current_date < end_date:
+        # Get the schedule for this day
+        schedule = KCCSchedule.query.filter_by(
+            package_id=booking.package_id,
+            day_name=current_date.strftime('%A').upper()
+        ).first()
+        
+        if schedule:
+            session = KCCBookingSession(
+                booking_id=booking_id,
+                schedule_id=schedule.id,
+                session_date=current_date,
+                start_time=schedule.start_time,
+                end_time=schedule.end_time,
+                status='scheduled'
+            )
+            db.session.add(session)
+        
+        current_date += timedelta(days=1)
+
+@app.route('/admin/kcc_attendance')
+@admin_required
+def admin_kcc_attendance():
+    # Get date from query params or use today
+    selected_date = request.args.get('date', datetime.now().date().strftime('%Y-%m-%d'))
+    date_obj = datetime.strptime(selected_date, '%Y-%m-%d').date()
+    
+    # Get all KCC sessions for the selected date
+    sessions = KCCBookingSession.query\
+        .join(KCCBooking)\
+        .join(KCCSchedule)\
+        .filter(
+            KCCBookingSession.session_date == date_obj,
+        )\
+        .order_by(KCCSchedule.start_time)\
+        .all()
+    
+    return render_template(
+        'admin/kcc_attendance.html',
+        sessions=sessions,
+        selected_date=selected_date
+    )
+
+@app.route('/update_kcc_presence_batch', methods=['POST'])
+@admin_required
+def update_kcc_presence_batch():
+    data = request.get_json()
+    updates = data.get('updates', [])
+    
+    try:
+        for update in updates:
+            session = KCCBookingSession.query.get(update['session_id'])
+            if session:
+                session.status = update['status']
+                session.notes = update.get('notes', '')
+        
+        db.session.commit()
+        return jsonify({'success': True})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)})
 
 if __name__ == '__main__':
     app.run(debug=True)

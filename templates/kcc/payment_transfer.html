@@ -1,0 +1,180 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card payment-card">
+                <div class="card-body text-center">
+                    <i class="fas fa-check-circle text-success mb-4" style="font-size: 4rem;"></i>
+                    <h3>Booking Confirmed!</h3>
+                    <p class="text-muted">Please complete your payment within 24 hours</p>
+                    
+                    <div class="payment-details mt-4">
+                        <h5>Payment Details</h5>
+                        <div class="price-breakdown">
+                            <p class="d-flex justify-content-between">
+                                <span>Package Price:</span>
+                                <span>Rp {{ "{:,}".format(package.price) }}</span>
+                            </p>
+                            
+                            <!-- Coupon Section -->
+                            <div class="coupon-section mb-3">
+                                <div class="input-group">
+                                    <input type="text" class="form-control" id="couponCode" 
+                                           placeholder="Enter coupon code">
+                                    <button class="btn btn-outline-primary" onclick="applyCoupon()">
+                                        Apply
+                                    </button>
+                                </div>
+                                <div id="couponMessage" class="text-start small mt-1"></div>
+                            </div>
+                            
+                            <div id="discountRow" class="d-none">
+                                <p class="d-flex justify-content-between text-success">
+                                    <span>Discount:</span>
+                                    <span id="discountAmount">-Rp 0</span>
+                                </p>
+                            </div>
+                            
+                            <hr>
+                            <p class="d-flex justify-content-between fw-bold">
+                                <span>Total Amount:</span>
+                                <span id="totalAmount">Rp {{ "{:,}".format(package.price) }}</span>
+                            </p>
+                        </div>
+                        
+                        <div class="bank-details mt-4">
+                            <h5>Bank Transfer Details</h5>
+                            <div class="bank-info">
+                                <p class="mb-1"><strong>Bank:</strong> BCA</p>
+                                <p class="mb-1"><strong>Account Number:</strong> 1234567890</p>
+                                <p class="mb-1"><strong>Account Name:</strong> KCC Swimming Pool</p>
+                            </div>
+                        </div>
+                        
+                        <div class="booking-reference mt-4">
+                            <p class="mb-1">Booking Reference:</p>
+                            <p class="reference-number">{{ booking.id }}</p>
+                        </div>
+                        
+                        {% if is_prorated %}
+                        <div class="alert alert-info mt-3">
+                            <small>Since you're registering mid-month, you'll receive a coupon for next month's payment 
+                            to adjust for the prorated amount.</small>
+                        </div>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="mt-4">
+                        <button onclick="confirmPayment()" class="btn btn-primary">Confirm Payment</button>
+                        <a href="{{ url_for('home') }}" class="btn btn-outline-secondary">View My Bookings</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let appliedDiscount = 0;
+
+async function applyCoupon() {
+    const couponCode = document.getElementById('couponCode').value;
+    const packagePrice = {{ package.price }};
+    
+    try {
+        const response = await fetch('/apply_kcc_coupon', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: `coupon_code=${couponCode}&package_price=${packagePrice}`
+        });
+        
+        const data = await response.json();
+        const messageDiv = document.getElementById('couponMessage');
+        
+        if (data.success) {
+            messageDiv.className = 'text-success small mt-1';
+            messageDiv.textContent = data.message;
+            appliedDiscount = data.discount_amount;
+            
+            // Show discount row
+            document.getElementById('discountRow').classList.remove('d-none');
+            document.getElementById('discountAmount').textContent = 
+                `-Rp ${data.discount_amount.toLocaleString()}`;
+            
+            // Update total amount
+            const totalAmount = packagePrice - data.discount_amount;
+            document.getElementById('totalAmount').textContent = 
+                `Rp ${totalAmount.toLocaleString()}`;
+        } else {
+            messageDiv.className = 'text-danger small mt-1';
+            messageDiv.textContent = data.message;
+        }
+    } catch (error) {
+        console.error('Error:', error);
+    }
+}
+
+function confirmPayment() {
+    const bookingId = '{{ booking.id }}';
+    
+    fetch('/update_kcc_payment_status', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: `booking_id=${bookingId}&applied_discount=${appliedDiscount}`
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            window.location.href = '/home';
+        } else {
+            alert(data.message);
+        }
+    })
+    .catch(error => console.error('Error:', error));
+}
+</script>
+
+<style>
+.payment-card {
+    border-radius: 15px;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.08);
+}
+
+.payment-details {
+    background: #f8f9fa;
+    padding: 20px;
+    border-radius: 10px;
+    margin: 20px 0;
+}
+
+.bank-info {
+    background: white;
+    padding: 15px;
+    border-radius: 8px;
+    margin: 10px 0;
+}
+
+.reference-number {
+    font-size: 1.2rem;
+    font-weight: bold;
+    color: #2c3e50;
+    background: #e9ecef;
+    padding: 8px 15px;
+    border-radius: 5px;
+    display: inline-block;
+}
+
+.price-breakdown {
+    background: white;
+    padding: 15px;
+    border-radius: 8px;
+    text-align: left;
+}
+</style>
+{% endblock %} 

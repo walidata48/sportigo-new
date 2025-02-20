@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card booking-card">
+                <div class="card-body text-center">
+                    <h3 class="mb-4">Booking Confirmation</h3>
+                    
+                    <div class="booking-details mb-4">
+                        <h5>Package Details</h5>
+                        <p class="package-name">{{ package.package_name }}</p>
+                        <div class="price-details">
+                            <div class="original-price">
+                                Original Price: <span>Rp {{ "{:,}".format(package.price) }}</span>
+                            </div>
+                            {% if booking.applied_discount > 0 %}
+                            <div class="discount text-success">
+                                Discount: <span>- Rp {{ "{:,}".format(booking.applied_discount) }}</span>
+                            </div>
+                            {% endif %}
+                            <div class="final-price mt-2 fw-bold">
+                                Final Price: <span>Rp {{ "{:,}".format(package.price - (booking.applied_discount or 0)) }}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Include the same content structure as ASA booking confirmation -->
+                    {% include "kcc/booking_confirmation_content.html" %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Include the same styles as ASA booking confirmation -->
+{% include "kcc/booking_confirmation_styles.html" %}
+{% endblock %} 
