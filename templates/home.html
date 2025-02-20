@@ -51,6 +51,52 @@
             {% endif %}
         </div>
 
+        <!-- KCC Club Bookings -->
+        <div class="booking-section mb-5">
+            <h3>KCC Club Sessions</h3>
+            {% if kcc_bookings %}
+                {% for booking in kcc_bookings %}
+                    <div class="booking-card mb-3">
+                        <div class="card">
+                            <div class="card-body">
+                                <h5 class="card-title">{{ booking.package.package_name }}</h5>
+                                <p class="card-text">
+                                    <strong>Booked on:</strong> {{ booking.booking_date.strftime('%d %B %Y') }}<br>
+                                    <strong>Status:</strong> 
+                                    <span class="badge {% if booking.payment_status == 'paid' %}bg-success{% else %}bg-warning{% endif %}">
+                                        {{ booking.payment_status.title() }}
+                                    </span>
+                                </p>
+                                
+                                {% if booking.sessions %}
+                                    <div class="sessions-list mt-3">
+                                        <h6>Upcoming Sessions:</h6>
+                                        <ul class="list-unstyled">
+                                            {% for session in booking.sessions %}
+                                                {% if session.session_date >= today %}
+                                                    <li class="session-item">
+                                                        {{ session.session_date.strftime('%d %B %Y') }} 
+                                                        ({{ session.start_time.strftime('%H:%M') }} - {{ session.end_time.strftime('%H:%M') }})
+                                                        <span class="badge {% if session.status == 'completed' %}bg-success{% elif session.status == 'cancelled' %}bg-danger{% else %}bg-info{% endif %}">
+                                                            {{ session.status }}
+                                                        </span>
+                                                    </li>
+                                                {% endif %}
+                                            {% endfor %}
+                                        </ul>
+                                    </div>
+                                {% endif %}
+                                
+                                <a href="{{ url_for('kcc_payment_transfer', booking_id=booking.id) }}" class="btn btn-primary btn-sm mt-2">View Details</a>
+                            </div>
+                        </div>
+                    </div>
+                {% endfor %}
+            {% else %}
+                <p class="text-muted">No KCC Club bookings found.</p>
+            {% endif %}
+        </div>
+
         <!-- Swimming School Bookings -->
         <div class="booking-section mb-5">
             <h3>Swimming School Sessions</h3>

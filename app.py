@@ -1210,40 +1210,40 @@ def initialize_asa_data():
 @app.route('/home')
 @login_required
 def home():
-    # Add today's date
     today = datetime.now().date()
     
-    # Get regular swimming school bookings
-    swimming_school_bookings = Booking.query.filter_by(
+    # Get ASA bookings
+    asa_bookings = ASABooking.query.filter_by(
         user_id=session['user_id']
-    ).order_by(
-        Booking.session_date.desc(),
-        Booking.start_time
-    ).all()
+    ).order_by(ASABooking.booking_date.desc()).all()
     
-    # Group swimming school bookings by group_id
+    # Get KCC bookings
+    kcc_bookings = KCCBooking.query.filter_by(
+        user_id=session['user_id']
+    ).order_by(KCCBooking.booking_date.desc()).all()
+    
+    # Get regular swimming school bookings
+    all_bookings = Booking.query.filter_by(
+        user_id=session['user_id']
+    ).order_by(Booking.session_date.desc()).all()
+
+    # Separate bookings into grouped and single
     grouped_bookings = {}
     single_bookings = []
-    
-    for booking in swimming_school_bookings:
+
+    for booking in all_bookings:
         if booking.group_id:
             if booking.group_id not in grouped_bookings:
                 grouped_bookings[booking.group_id] = []
             grouped_bookings[booking.group_id].append(booking)
         else:
             single_bookings.append(booking)
-    
-    # Get ASA club bookings
-    asa_bookings = ASABooking.query.filter_by(
-        user_id=session['user_id']
-    ).order_by(
-        ASABooking.booking_date.desc()
-    ).all()
-    
+
     return render_template('home.html',
+                         asa_bookings=asa_bookings,
+                         kcc_bookings=kcc_bookings,
                          grouped_bookings=grouped_bookings,
                          single_bookings=single_bookings,
-                         asa_bookings=asa_bookings,
                          today=today)
 
 @app.route('/admin')
@@ -1946,21 +1946,21 @@ def update_kcc_payment_status():
         
         booking = KCCBooking.query.get_or_404(booking_id)
         
-        # Update booking with applied discount
+        # Update booking payment status to 'paid'
+        booking.payment_status = 'paid'
         booking.applied_discount = applied_discount
         
-        # Calculate next payment date (1st of next month)
+        # Calculate next payment date
         today = datetime.now().date()
-        if today.day > 10:  # If after 10th, set next payment to month after next
+        if today.day > 10:
             next_month = today.replace(day=1) + timedelta(days=32)
             booking.next_payment_date = next_month.replace(day=1)
-        else:  # If before 10th, set next payment to 1st of next month
+        else:
             next_month = today.replace(day=1) + timedelta(days=32)
             booking.next_payment_date = next_month.replace(day=1)
         
-        # Set recurring payment date
-        booking.recurring_payment_date = 1  # Always 1st of the month
-        booking.is_active = True  # Activate the booking
+        booking.recurring_payment_date = 1
+        booking.is_active = True
         
         # Create booking sessions
         create_kcc_booking_sessions(booking.id)
