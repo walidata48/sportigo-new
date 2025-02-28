@@ -750,7 +750,7 @@ def notification():
         # Cek status pembayaran
         status_code = notification['transaction_status']
         order_id = notification['order_id']
-        
+        print(status_code)
         if status_code == 'settlement':
             # Transaksi berhasil dan terkonfirmasi
             first_booking = Booking.query.get_or_404(order_id)
@@ -1265,6 +1265,37 @@ def admin_dashboard():
         .order_by(KCCBookingSession.start_time)\
         .all()
 
+    # Get all unique times from quotas
+    available_times = db.session.query(distinct(Quota.start_time)).all()
+    available_times = [time[0].strftime('%H:%M') for time in available_times]
+
+    # Calculate bookings count per location and time slot
+    bookings_count = {}
+    for location in Location.query.all():
+        for quota in location.quotas:
+            if quota.day_name == selected_date.strftime('%A'):
+                time_str = quota.start_time.strftime('%H:%M')
+                count = Booking.query.filter(
+                    Booking.location_id == location.id,
+                    Booking.session_date == selected_date,
+                    Booking.start_time == quota.start_time
+                ).count()
+                bookings_count[(location.id, time_str)] = count
+
+    # Get daily bookings
+    bookings_query = Booking.query.filter(Booking.session_date == selected_date)
+    if selected_location:
+        bookings_query = bookings_query.filter(Booking.location_id == selected_location)
+    if selected_time:
+        time_obj = datetime.strptime(selected_time, '%H:%M').time()
+        bookings_query = bookings_query.filter(Booking.start_time == time_obj)
+    
+    daily_bookings = bookings_query.all()
+
+    # Get ASA schedules and bookings for the Swimming Club tab
+    asa_schedules = ASASchedule.query.all()
+    asa_bookings = ASABooking.query.order_by(ASABooking.booking_date.desc()).limit(10).all()
+
     return render_template(
         'admin/dashboard.html',
         selected_date=selected_date,
@@ -1272,7 +1303,11 @@ def admin_dashboard():
         selected_time=selected_time,
         kcc_sessions=kcc_sessions,
         locations=Location.query.all(),
-        available_times=get_available_times()
+        available_times=available_times,
+        bookings_count=bookings_count,
+        daily_bookings=daily_bookings,
+        asa_schedules=asa_schedules,
+        asa_bookings=asa_bookings
     )
 
 @app.route('/update_presence_batch', methods=['POST'])
@@ -1566,7 +1601,7 @@ def admin_asa_attendance():
         )\
         .order_by(ASASchedule.start_time)\
         .all()
-    
+
     return render_template(
         'admin/asa_attendance.html',
         sessions=sessions,
