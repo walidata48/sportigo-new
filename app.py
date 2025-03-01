@@ -9,9 +9,10 @@ from flask.cli import FlaskGroup
 from sqlalchemy import distinct, or_
 import midtransclient
 import json
+from uuid import uuid4
 
 app = Flask(__name__)
-app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://waliy:12345@localhost/swim'
+app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://root:linkinpark1@localhost/sportigo_windows'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.secret_key = 'your-secret-key-here'  
 db = SQLAlchemy(app)
@@ -71,7 +72,7 @@ class Quota(db.Model):
     quota = db.Column(db.Integer, nullable=False)
 
 class Booking(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
+    id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid4()))
     group_id = db.Column(db.String(50), nullable=True)
     location_id = db.Column(db.Integer, db.ForeignKey('location.id'), nullable=False)
     session_date = db.Column(db.Date, nullable=False)
@@ -125,7 +126,7 @@ class ASASchedule(db.Model):
 
 class ASABooking(db.Model):
     __tablename__ = 'asa_bookings'
-    id = db.Column(db.Integer, primary_key=True)
+    id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid4()))
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     package_id = db.Column(db.Integer, db.ForeignKey('asa_packages.id'), nullable=False)
     booking_date = db.Column(db.DateTime, default=datetime.utcnow)
@@ -142,12 +143,12 @@ class ASABooking(db.Model):
 class ASABookingSession(db.Model):
     __tablename__ = 'asa_booking_sessions'
     id = db.Column(db.Integer, primary_key=True)
-    booking_id = db.Column(db.Integer, db.ForeignKey('asa_bookings.id'), nullable=False)
+    booking_id = db.Column(db.String(36), db.ForeignKey('asa_bookings.id'), nullable=False)
     schedule_id = db.Column(db.Integer, db.ForeignKey('asa_schedules.id'), nullable=False)
     session_date = db.Column(db.Date, nullable=False)
     start_time = db.Column(db.Time, nullable=False)
     end_time = db.Column(db.Time, nullable=False)
-    status = db.Column(db.String(20), default='scheduled')  # scheduled, completed, cancelled
+    status = db.Column(db.String(20), default='scheduled')
     notes = db.Column(db.Text, nullable=True)
     
     schedule = db.relationship('ASASchedule')
@@ -197,7 +198,7 @@ class KCCSchedule(db.Model):
 
 class KCCBooking(db.Model):
     __tablename__ = 'kcc_bookings'
-    id = db.Column(db.Integer, primary_key=True)
+    id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid4()))
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     package_id = db.Column(db.Integer, db.ForeignKey('kcc_packages.id'), nullable=False)
     booking_date = db.Column(db.DateTime, default=datetime.utcnow)
@@ -214,7 +215,7 @@ class KCCBooking(db.Model):
 class KCCBookingSession(db.Model):
     __tablename__ = 'kcc_booking_sessions'
     id = db.Column(db.Integer, primary_key=True)
-    booking_id = db.Column(db.Integer, db.ForeignKey('kcc_bookings.id'), nullable=False)
+    booking_id = db.Column(db.String(36), db.ForeignKey('kcc_bookings.id'), nullable=False)
     schedule_id = db.Column(db.Integer, db.ForeignKey('kcc_schedules.id'), nullable=False)
     session_date = db.Column(db.Date, nullable=False)
     start_time = db.Column(db.Time, nullable=False)
@@ -432,7 +433,7 @@ def confirm_booking():
         end_time=end_time
     )
 
-@app.route('/booking_confirmation/<int:booking_id>')
+@app.route('/booking_confirmation/<string:booking_id>')
 @login_required
 def booking_confirmation(booking_id):
     # Get the first booking
@@ -1115,7 +1116,7 @@ def apply_asa_coupon():
             'success': False,
             'message': 'Nilai kupon melebihi harga paket'
         })
-    
+
     return jsonify({
         'success': True,
         'discount_amount': coupon.discount_amount,
@@ -1404,7 +1405,7 @@ def admin_schedule_changes():
 @admin_required
 def update_schedule():
     try:
-        booking_id = request.form.get('booking_id')
+        booking_id = request.form.get('booking_id')  # Now expecting a UUID string
         new_date = request.form.get('new_date')
         new_time = request.form.get('new_time')
         
@@ -1414,7 +1415,7 @@ def update_schedule():
                 'message': 'Missing required information'
             })
 
-        # Get the booking
+        # Get the booking using UUID string
         booking = Booking.query.get_or_404(booking_id)
         
         # Parse the new time slot (format: "HH:MM - HH:MM")
@@ -1446,9 +1447,9 @@ def update_schedule():
 @admin_required
 def check_quota_availability():
     try:
-        booking_id = request.form.get('booking_id')
+        booking_id = request.form.get('booking_id')  # Now expecting a UUID string
         new_date = request.form.get('new_date')
-        new_time = request.form.get('new_time')  # New parameter for time slot
+        new_time = request.form.get('new_time')
         location_id = request.form.get('location_id')
         
         if not all([booking_id, new_date, new_time]):
@@ -1457,7 +1458,7 @@ def check_quota_availability():
                 'message': 'Missing required information'
             })
 
-        # Get the booking and its details
+        # Get the booking using UUID string
         booking = Booking.query.get_or_404(booking_id)
         
         # If no new location selected, use current location
@@ -1487,13 +1488,13 @@ def check_quota_availability():
                 'message': f'No schedule available for this time slot at the selected location'
             })
         
-        # Count existing bookings
+        # Count existing bookings, excluding current booking using UUID
         existing_bookings = Booking.query.filter(
             Booking.location_id == location_id,
             Booking.session_date == selected_date,
             Booking.start_time == start_time,
             Booking.end_time == end_time,
-            Booking.id != booking_id  # Exclude current booking
+            Booking.id != booking_id  # Using UUID string comparison
         ).count()
         
         available = existing_bookings < quota.quota
