@@ -297,10 +297,22 @@ def index():
      for field in ASASchedule.__table__.columns} 
     for schedule in asa_regular_schedules
     ]
+
+    regular_package = KCCPool.query.filter_by(package_name='Reguler').first()
+
+    kcc_regular_schedules = []
+    if regular_package:
+        kcc_regular_schedules = KCCSchedule.query.filter_by(package_id=regular_package.id).all()
+    kcc_regular_schedules = [
+    {field.name: getattr(schedule, field.name).title() if isinstance(getattr(schedule, field.name), str) else getattr(schedule, field.name) 
+     for field in KCCSchedule.__table__.columns} 
+    for schedule in kcc_regular_schedules
+    ]
     return render_template('dashboard.html', 
                          locations=locations, 
                          translate_day=translate_day,
-                         asa_regular_schedules=asa_regular_schedules)
+                         #asa_regular_schedules=asa_regular_schedules,
+                         kcc_regular_schedules=kcc_regular_schedules)
 
 @app.route('/dashboard')
 @login_required
@@ -308,16 +320,20 @@ def dashboard():
     locations = Location.query.all()
     
     # Get regular package schedules
-    regular_package = ASAPool.query.filter_by(package_name='Reguler').first()
+    regular_package_asa = ASAPool.query.filter_by(package_name='Reguler').first()
     asa_regular_schedules = []
-    if regular_package:
-        asa_regular_schedules = ASASchedule.query.filter_by(package_id=regular_package.id).all()
+    if regular_package_asa:
+        asa_regular_schedules = ASASchedule.query.filter_by(package_id=regular_package_asa.id).all()
 
-    
+    regular_package_kcc = KCCPool.query.filter_by(package_name='Reguler').first()
+    kcc_regular_schedules = []
+    if regular_package_kcc:
+        kcc_regular_schedules = KCCSchedule.query.filter_by(package_id=regular_package_kcc.id).all()
     return render_template('dashboard.html', 
                          locations=locations, 
                          translate_day=translate_day,
-                         asa_regular_schedules=asa_regular_schedules)
+                         asa_regular_schedules=asa_regular_schedules,
+                         kcc_regular_schedules=kcc_regular_schedules)
 
 @app.route('/get_available_slots', methods=['POST'])
 @login_required
@@ -928,7 +944,7 @@ def asa_book(package_id):
         flash('An error occurred while processing your booking. Please try again.', 'error')
         return redirect(url_for('asa_packages'))
 
-@app.route('/asa/booking_confirmation/<int:booking_id>')
+@app.route('/asa/booking_confirmation/<string:booking_id>')
 @login_required
 def asa_booking_confirmation(booking_id):
     booking = ASABooking.query.get_or_404(booking_id)
@@ -948,7 +964,7 @@ def asa_booking_confirmation(booking_id):
 @login_required
 def update_asa_payment_status():
     try:
-        booking_id = request.form.get('booking_id')
+        booking_id = request.form.get('booking_id')  # Now expecting UUID string
         applied_discount = request.form.get('applied_discount', type=int) or 0
         
         booking = ASABooking.query.get_or_404(booking_id)
@@ -963,23 +979,6 @@ def update_asa_payment_status():
         next_month = (today.replace(day=1) + timedelta(days=32)).replace(day=1)
         booking.next_payment_date = next_month
         
-        # If registration is after the 10th, generate a prorated coupon for next month
-        if today.day > 10:
-            # Calculate prorated amount based on remaining days in month
-            days_in_month = calendar.monthrange(today.year, today.month)[1]
-            remaining_days = days_in_month - today.day
-            prorated_amount = int((package.price / days_in_month) * remaining_days)
-            
-            # Create coupon for next month
-            coupon = Coupon(
-                code=f"PRORATED{booking.id}",
-                discount_amount=prorated_amount,
-                valid_until=next_month.replace(day=10),  # Valid until 10th of next month
-                is_active=True,
-                user_id=session['user_id']
-            )
-            db.session.add(coupon)
-        
         # Update booking with discount and payment status
         booking.applied_discount = applied_discount
         booking.payment_status = 'paid'
@@ -987,7 +986,7 @@ def update_asa_payment_status():
         db.session.commit()
         
         # Schedule automatic attendance sessions
-        schedule_attendance_sessions(booking.id, today)
+        schedule_attendance_sessions(booking_id, today)
         
         return jsonify({
             'success': True,
@@ -1003,7 +1002,7 @@ def update_asa_payment_status():
 
 def schedule_attendance_sessions(booking_id, start_date):
     """Create attendance sessions for the next month"""
-    booking = ASABooking.query.get(booking_id)
+    booking = ASABooking.query.get(booking_id)  # Works with UUID string
     end_date = (start_date.replace(day=1) + timedelta(days=32)).replace(day=start_date.day)
 
     # Get all dates that are Tuesday, Thursday, or Saturday between start_date and end_date
@@ -1019,7 +1018,7 @@ def schedule_attendance_sessions(booking_id, start_date):
             
             if schedule:
                 session = ASABookingSession(
-                    booking_id=booking_id,
+                    booking_id=booking_id,  # UUID string is fine here
                     schedule_id=schedule.id,
                     session_date=current_date,
                     start_time=schedule.start_time,
@@ -1031,7 +1030,7 @@ def schedule_attendance_sessions(booking_id, start_date):
     
     db.session.commit()
 
-@app.route('/asa/my_schedule/<int:booking_id>')
+@app.route('/asa/my_schedule/<string:booking_id>')
 @login_required
 def asa_my_schedule(booking_id):
     booking = ASABooking.query.get_or_404(booking_id)
@@ -1916,7 +1915,7 @@ def kcc_book(package_id):
         flash('An error occurred while processing your booking. Please try again.', 'error')
         return redirect(url_for('kcc_packages'))
 
-@app.route('/kcc/payment/transfer/<int:booking_id>')
+@app.route('/kcc/payment/transfer/<string:booking_id>')
 @login_required
 def kcc_payment_transfer(booking_id):
     booking = KCCBooking.query.get_or_404(booking_id)
@@ -1977,7 +1976,7 @@ def apply_kcc_coupon():
 @login_required
 def update_kcc_payment_status():
     try:
-        booking_id = request.form.get('booking_id')
+        booking_id = request.form.get('booking_id')  # Now expecting UUID string
         applied_discount = int(request.form.get('applied_discount', 0))
         
         booking = KCCBooking.query.get_or_404(booking_id)
@@ -1999,7 +1998,7 @@ def update_kcc_payment_status():
         booking.is_active = True
         
         # Create booking sessions
-        create_kcc_booking_sessions(booking.id)
+        create_kcc_booking_sessions(booking_id)
         
         db.session.commit()
         
@@ -2015,7 +2014,7 @@ def update_kcc_payment_status():
         })
 
 def create_kcc_booking_sessions(booking_id):
-    booking = KCCBooking.query.get(booking_id)
+    booking = KCCBooking.query.get(booking_id)  # Works with UUID string
     
     # Calculate start and end dates
     today = datetime.now().date()
@@ -2038,7 +2037,7 @@ def create_kcc_booking_sessions(booking_id):
         
         if schedule:
             session = KCCBookingSession(
-                booking_id=booking_id,
+                booking_id=booking_id,  # UUID string is fine here
                 schedule_id=schedule.id,
                 session_date=current_date,
                 start_time=schedule.start_time,

@@ -39,17 +39,23 @@
                 
                 <!-- KCC Club Card -->
                 <div class="col-md-5">
-                    <div class="program-card coming-soon">
+                    <div class="program-card">
                         <div class="pool-card">
                             <h5>KCC Club</h5>
-                            <div class="coming-soon-content">
-                                <i class="fas fa-clock coming-soon-icon"></i>
-                                <p class="coming-soon-text">Segera Hadir</p>
+                            <div class="pool-details">
+                                <div class="schedule-info">
+                                    {% for schedule in kcc_regular_schedules %}
+                                    <div class="schedule-item">
+                                        <span class="day">{{ translate_day(schedule.day_name) }}</span>
+                                        <span class="time"><i class="far fa-clock me-1"></i>{{ schedule.start_time }}</span>
+                                    </div>
+                                    {% endfor %}
+                                </div>
                             </div>
                         </div>
-                        <button class="btn btn-secondary w-100 mt-4" disabled>
-                            <i class="fas fa-hourglass-half me-2"></i>Segera Hadir
-                        </button>
+                        <a href="{{ url_for('kcc_packages') }}" class="btn btn-primary w-100 mt-4">
+                            <i class="fas fa-arrow-right me-2"></i>Pilih Paket
+                        </a>
                     </div>
                 </div>
             </div>
