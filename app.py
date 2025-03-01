@@ -90,6 +90,13 @@ class User(db.Model):
     email = db.Column(db.String(120), unique=True, nullable=False)
     password_hash = db.Column(db.String(255), nullable=False)
     is_admin = db.Column(db.Boolean, default=False)
+    full_name = db.Column(db.String(100))
+    birthdate = db.Column(db.Date)
+    parent_name = db.Column(db.String(100))
+    address = db.Column(db.Text)
+    mobile_phone = db.Column(db.String(20))
+    school = db.Column(db.String(100))
+    gender = db.Column(db.String(10))
     bookings = db.relationship('Booking', backref='user', lazy=True)
 
 class Coupon(db.Model):
@@ -311,7 +318,7 @@ def index():
     return render_template('dashboard.html', 
                          locations=locations, 
                          translate_day=translate_day,
-                         #asa_regular_schedules=asa_regular_schedules,
+                         asa_regular_schedules=asa_regular_schedules,
                          kcc_regular_schedules=kcc_regular_schedules)
 
 @app.route('/dashboard')
@@ -579,10 +586,32 @@ def signup():
         username = request.form.get('username')
         email = request.form.get('email')
         password = request.form.get('password')
+        # New fields
+        full_name = request.form.get('full_name')
+        birthdate = request.form.get('birthdate')
+        parent_name = request.form.get('parent_name')
+        address = request.form.get('address')
+        mobile_phone = request.form.get('mobile_phone')
+        school = request.form.get('school')
+        gender = request.form.get('gender')
 
         # Add validation for empty fields
-        if not username or not email or not password:
-            flash('All fields are required')
+        required_fields = {
+            'Username': username,
+            'Email': email,
+            'Password': password,
+            'Full Name': full_name,
+            'Birthdate': birthdate,
+            'Parent Name': parent_name,
+            'Address': address,
+            'Mobile Phone': mobile_phone,
+            'Gender': gender
+        }
+
+        # Check for empty required fields
+        empty_fields = [field for field, value in required_fields.items() if not value]
+        if empty_fields:
+            flash(f"Required fields cannot be empty: {', '.join(empty_fields)}")
             return redirect(url_for('signup'))
 
         # Check if username or email already exists
@@ -598,7 +627,15 @@ def signup():
             user = User(
                 username=username,
                 email=email,
-                password_hash=generate_password_hash(password)
+                password_hash=generate_password_hash(password),
+                # Add new fields
+                full_name=full_name,
+                birthdate=datetime.strptime(birthdate, '%Y-%m-%d').date(),
+                parent_name=parent_name,
+                address=address,
+                mobile_phone=mobile_phone,
+                school=school,
+                gender=gender
             )
             db.session.add(user)
             db.session.commit()
