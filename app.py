@@ -1947,13 +1947,74 @@ def kcc_book(package_id):
     booking = KCCBooking(
         user_id=session['user_id'],
         package_id=package_id,
-        payment_status='pending'
+        payment_status='pending',
+        is_active=True  # Set active immediately
     )
+    
+    # Calculate next payment date
+    today = datetime.now().date()
+    if today.day > 10:
+        next_month = today.replace(day=1) + timedelta(days=32)
+        booking.next_payment_date = next_month.replace(day=1)
+    else:
+        next_month = today.replace(day=1) + timedelta(days=32)
+        booking.next_payment_date = next_month.replace(day=1)
+    
+    booking.recurring_payment_date = 1
+    
     db.session.add(booking)
     
     try:
+        db.session.commit()  # Commit booking first to get booking_id
+        
+        # Create booking sessions immediately
+        # Calculate start and end dates
+        start_date = today
+        if today.day > 10:  # If after 10th, start from next month
+            start_date = (today.replace(day=1) + timedelta(days=32)).replace(day=1)
+        else:  # If before 10th, start from current month
+            start_date = today.replace(day=1)
+        
+        # End date is the last day of the month
+        end_date = (start_date.replace(day=1) + timedelta(days=32)).replace(day=1)
+        
+        # Day name translation dictionary
+        day_translations = {
+            'MONDAY': 'SENIN',
+            'TUESDAY': 'SELASA',
+            'WEDNESDAY': 'RABU',
+            'THURSDAY': 'KAMIS',
+            'FRIDAY': 'JUMAT',
+            'SATURDAY': 'SABTU',
+            'SUNDAY': 'MINGGU'
+        }
+        
+        # Get all schedules for this package
+        schedules = KCCSchedule.query.filter_by(package_id=booking.package_id).all()
+        
+        # Create sessions for each day until end of month
+        current_date = start_date
+        while current_date < end_date:
+            english_day = current_date.strftime('%A').upper()
+            indo_day = day_translations[english_day]
+            
+            # Find matching schedule for this day
+            for schedule in schedules:
+                if schedule.day_name == indo_day:
+                    booking_session = KCCBookingSession(  # Changed variable name from 'session' to 'booking_session'
+                        booking_id=booking.id,
+                        schedule_id=schedule.id,
+                        session_date=current_date,
+                        start_time=schedule.start_time,
+                        end_time=schedule.end_time,
+                        status='scheduled'
+                    )
+                    db.session.add(booking_session)  # Using the new variable name
+            current_date += timedelta(days=1)
+        
         db.session.commit()
         return redirect(url_for('kcc_payment_transfer', booking_id=booking.id))
+        
     except Exception as e:
         db.session.rollback()
         flash('An error occurred while processing your booking. Please try again.', 'error')
@@ -2028,63 +2089,6 @@ def update_kcc_payment_status():
         # Update booking payment status to 'paid'
         booking.payment_status = 'paid'
         booking.applied_discount = applied_discount
-        
-        # Calculate next payment date
-        today = datetime.now().date()
-        if today.day > 10:
-            next_month = today.replace(day=1) + timedelta(days=32)
-            booking.next_payment_date = next_month.replace(day=1)
-        else:
-            next_month = today.replace(day=1) + timedelta(days=32)
-            booking.next_payment_date = next_month.replace(day=1)
-        
-        booking.recurring_payment_date = 1
-        booking.is_active = True
-        
-        # Create booking sessions
-        # Calculate start and end dates
-        start_date = today
-        if today.day > 10:  # If after 10th, start from next month
-            start_date = (today.replace(day=1) + timedelta(days=32)).replace(day=1)
-        else:  # If before 10th, start from current month
-            start_date = today.replace(day=1)
-        
-        # End date is the last day of the month
-        end_date = (start_date.replace(day=1) + timedelta(days=32)).replace(day=1)
-        
-        # Day name translation dictionary
-        day_translations = {
-            'MONDAY': 'SENIN',
-            'TUESDAY': 'SELASA',
-            'WEDNESDAY': 'RABU',
-            'THURSDAY': 'KAMIS',
-            'FRIDAY': 'JUMAT',
-            'SATURDAY': 'SABTU',
-            'SUNDAY': 'MINGGU'
-        }
-        
-        # Get all schedules for this package
-        schedules = KCCSchedule.query.filter_by(package_id=booking.package_id).all()
-        
-        # Create sessions for each day until end of month
-        current_date = start_date
-        while current_date < end_date:
-            english_day = current_date.strftime('%A').upper()
-            indo_day = day_translations[english_day]
-            
-            # Find matching schedule for this day
-            for schedule in schedules:
-                if schedule.day_name == indo_day:
-                    session = KCCBookingSession(
-                        booking_id=booking_id,
-                        schedule_id=schedule.id,
-                        session_date=current_date,
-                        start_time=schedule.start_time,
-                        end_time=schedule.end_time,
-                        status='scheduled'
-                    )
-                    db.session.add(session)
-            current_date += timedelta(days=1)
         
         db.session.commit()
         

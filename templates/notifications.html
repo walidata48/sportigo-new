@@ -44,8 +44,12 @@
                                     </div>
                                     
                                     <div>
+                                        {% set payment_month = notification.payment_date.strftime('%Y-%m') %}
+                                        {% set current_month = today.strftime('%Y-%m') %}
                                         <button class="btn btn-primary" 
-                                                onclick="processPayment('{{ notification.booking_id }}', '{{ notification.type }}')">
+                                                onclick="processPayment('{{ notification.booking_id }}', '{{ notification.type }}')"
+                                                {% if payment_month > current_month %}disabled{% endif %}
+                                                title="{% if payment_month > current_month %}Payment will be available in {{ notification.payment_date.strftime('%B %Y') }}{% endif %}">
                                             Pay Now
                                         </button>
                                     </div>
