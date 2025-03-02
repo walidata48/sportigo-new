@@ -2020,7 +2020,7 @@ def apply_kcc_coupon():
 @login_required
 def update_kcc_payment_status():
     try:
-        booking_id = request.form.get('booking_id')  # Now expecting UUID string
+        booking_id = request.form.get('booking_id')
         applied_discount = int(request.form.get('applied_discount', 0))
         
         booking = KCCBooking.query.get_or_404(booking_id)
@@ -2042,7 +2042,49 @@ def update_kcc_payment_status():
         booking.is_active = True
         
         # Create booking sessions
-        create_kcc_booking_sessions(booking_id)
+        # Calculate start and end dates
+        start_date = today
+        if today.day > 10:  # If after 10th, start from next month
+            start_date = (today.replace(day=1) + timedelta(days=32)).replace(day=1)
+        else:  # If before 10th, start from current month
+            start_date = today.replace(day=1)
+        
+        # End date is the last day of the month
+        end_date = (start_date.replace(day=1) + timedelta(days=32)).replace(day=1)
+        
+        # Day name translation dictionary
+        day_translations = {
+            'MONDAY': 'SENIN',
+            'TUESDAY': 'SELASA',
+            'WEDNESDAY': 'RABU',
+            'THURSDAY': 'KAMIS',
+            'FRIDAY': 'JUMAT',
+            'SATURDAY': 'SABTU',
+            'SUNDAY': 'MINGGU'
+        }
+        
+        # Get all schedules for this package
+        schedules = KCCSchedule.query.filter_by(package_id=booking.package_id).all()
+        
+        # Create sessions for each day until end of month
+        current_date = start_date
+        while current_date < end_date:
+            english_day = current_date.strftime('%A').upper()
+            indo_day = day_translations[english_day]
+            
+            # Find matching schedule for this day
+            for schedule in schedules:
+                if schedule.day_name == indo_day:
+                    session = KCCBookingSession(
+                        booking_id=booking_id,
+                        schedule_id=schedule.id,
+                        session_date=current_date,
+                        start_time=schedule.start_time,
+                        end_time=schedule.end_time,
+                        status='scheduled'
+                    )
+                    db.session.add(session)
+            current_date += timedelta(days=1)
         
         db.session.commit()
         
@@ -2056,41 +2098,6 @@ def update_kcc_payment_status():
             'success': False,
             'message': str(e)
         })
-
-def create_kcc_booking_sessions(booking_id):
-    booking = KCCBooking.query.get(booking_id)  # Works with UUID string
-    
-    # Calculate start and end dates
-    today = datetime.now().date()
-    if today.day > 10:  # If after 10th, start from next month
-        start_date = (today.replace(day=1) + timedelta(days=32)).replace(day=1)
-    else:  # If before 10th, start from current month
-        start_date = today.replace(day=1)
-    
-    # End date is the last day of the month
-    end_date = (start_date.replace(day=1) + timedelta(days=32)).replace(day=1)
-    
-    # Create sessions for each available day
-    current_date = start_date
-    while current_date < end_date:
-        # Get the schedule for this day
-        schedule = KCCSchedule.query.filter_by(
-            package_id=booking.package_id,
-            day_name=current_date.strftime('%A').upper()
-        ).first()
-        
-        if schedule:
-            session = KCCBookingSession(
-                booking_id=booking_id,  # UUID string is fine here
-                schedule_id=schedule.id,
-                session_date=current_date,
-                start_time=schedule.start_time,
-                end_time=schedule.end_time,
-                status='scheduled'
-            )
-            db.session.add(session)
-        
-        current_date += timedelta(days=1)
 
 @app.route('/admin/kcc_attendance')
 @admin_required
