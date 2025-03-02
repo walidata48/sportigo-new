@@ -1001,7 +1001,7 @@ def asa_booking_confirmation(booking_id):
 @login_required
 def update_asa_payment_status():
     try:
-        booking_id = request.form.get('booking_id')  # Now expecting UUID string
+        booking_id = request.form.get('booking_id')
         applied_discount = request.form.get('applied_discount', type=int) or 0
         
         booking = ASABooking.query.get_or_404(booking_id)
@@ -1020,10 +1020,47 @@ def update_asa_payment_status():
         booking.applied_discount = applied_discount
         booking.payment_status = 'paid'
         
-        db.session.commit()
+        # Create attendance sessions for the current month
+        current_date = today
+        if today.day > 10:  # If after 10th, start from next month
+            current_date = next_month
         
-        # Schedule automatic attendance sessions
-        schedule_attendance_sessions(booking_id, today)
+        end_date = (current_date.replace(day=1) + timedelta(days=32)).replace(day=1)
+        
+        # Day name translation dictionary
+        day_translations = {
+            'MONDAY': 'SENIN',
+            'TUESDAY': 'SELASA',
+            'WEDNESDAY': 'RABU',
+            'THURSDAY': 'KAMIS',
+            'FRIDAY': 'JUMAT',
+            'SATURDAY': 'SABTU',
+            'SUNDAY': 'MINGGU'
+        }
+        
+        # Get all schedules for this package
+        schedules = ASASchedule.query.filter_by(package_id=booking.package_id).all()
+        
+        # Create sessions for each day until end of month
+        while current_date < end_date:
+            english_day = current_date.strftime('%A').upper()
+            indo_day = day_translations[english_day]
+            
+            # Find matching schedule for this day
+            for schedule in schedules:
+                if schedule.day_name == indo_day:
+                    session = ASABookingSession(
+                        booking_id=booking_id,
+                        schedule_id=schedule.id,
+                        session_date=current_date,
+                        start_time=schedule.start_time,
+                        end_time=schedule.end_time,
+                        status='scheduled'
+                    )
+                    db.session.add(session)
+            current_date += timedelta(days=1)
+        
+        db.session.commit()
         
         return jsonify({
             'success': True,
@@ -1036,36 +1073,6 @@ def update_asa_payment_status():
             'success': False,
             'message': f'Payment failed: {str(e)}'
         })
-
-def schedule_attendance_sessions(booking_id, start_date):
-    """Create attendance sessions for the next month"""
-    booking = ASABooking.query.get(booking_id)  # Works with UUID string
-    end_date = (start_date.replace(day=1) + timedelta(days=32)).replace(day=start_date.day)
-
-    # Get all dates that are Tuesday, Thursday, or Saturday between start_date and end_date
-    current_date = start_date
-    while current_date < end_date:
-        # 1 = Tuesday, 3 = Thursday, 5 = Saturday
-        if current_date.weekday() in [1, 3, 5]:
-            # Get the schedule for this day
-            schedule = ASASchedule.query.filter_by(
-                package_id=booking.package_id,
-                day_name=current_date.strftime('%A').upper()
-            ).first()
-            
-            if schedule:
-                session = ASABookingSession(
-                    booking_id=booking_id,  # UUID string is fine here
-                    schedule_id=schedule.id,
-                    session_date=current_date,
-                    start_time=schedule.start_time,
-                    end_time=schedule.end_time,
-                    status='scheduled'
-                )
-                db.session.add(session)
-        current_date += timedelta(days=1)
-    
-    db.session.commit()
 
 @app.route('/asa/my_schedule/<string:booking_id>')
 @login_required
