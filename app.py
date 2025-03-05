@@ -2552,5 +2552,32 @@ def reset_password(token):
         
     return render_template('reset_password.html')
 
+@app.route('/profile', methods=['GET', 'POST'])
+@login_required
+def profile():
+    user = User.query.get(session['user_id'])
+    
+    if request.method == 'POST':
+        try:
+            # Update user information
+            user.full_name = request.form.get('full_name')
+            user.birthdate = datetime.strptime(request.form.get('birthdate'), '%Y-%m-%d').date() if request.form.get('birthdate') else None
+            user.parent_name = request.form.get('parent_name')
+            user.address = request.form.get('address')
+            user.mobile_phone = request.form.get('mobile_phone')
+            user.school = request.form.get('school')
+            user.gender = request.form.get('gender')
+            
+            db.session.commit()
+            flash('Profile updated successfully!', 'success')
+            return redirect(url_for('profile'))
+            
+        except Exception as e:
+            db.session.rollback()
+            flash('An error occurred while updating your profile.', 'error')
+            return redirect(url_for('profile'))
+    
+    return render_template('profile.html', user=user)
+
 if __name__ == '__main__':
     app.run(debug=True)
