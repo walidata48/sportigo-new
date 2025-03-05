@@ -14,6 +14,12 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 import atexit
 from sqlalchemy import extract
+from secrets import token_urlsafe
+from flask_mail import Message, Mail
+import os
+from dotenv import load_dotenv
+
+load_dotenv()  # Load environment variables from .env file
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://root:linkinpark1@localhost/sportigo_windows'
@@ -24,6 +30,16 @@ migrate = Migrate(app, db)
 
 MIDTRANS_SERVER_KEY = 'SB-Mid-server-1EZNZC7WrVYhVQhK_V22gtDM'  # Ganti dengan server key Anda
 MIDTRANS_CLIENT_KEY = 'SB-Mid-client-_2sU7mKfWAXz2N4S'  # Ganti dengan client key Anda
+
+# Add these configurations after creating the Flask app
+app.config['MAIL_SERVER'] = 'smtp.gmail.com'
+app.config['MAIL_PORT'] = 587
+app.config['MAIL_USE_TLS'] = True
+app.config['MAIL_USERNAME'] = os.getenv('MAIL_USERNAME')
+app.config['MAIL_PASSWORD'] = os.getenv('MAIL_PASSWORD')
+app.config['MAIL_DEFAULT_SENDER'] = os.getenv('MAIL_USERNAME')  # Replace with your email
+
+mail = Mail(app)
 
 #db = SQLAlchemy(app)
 #migrate = Migrate(app, db)
@@ -93,6 +109,7 @@ class User(db.Model):
     username = db.Column(db.String(80), unique=True, nullable=False)
     email = db.Column(db.String(120), unique=True, nullable=False)
     password_hash = db.Column(db.String(255), nullable=False)
+    registration_date = db.Column(db.DateTime, nullable=True, default=datetime.utcnow)
     is_admin = db.Column(db.Boolean, default=False)
     full_name = db.Column(db.String(100))
     birthdate = db.Column(db.Date)
@@ -102,6 +119,8 @@ class User(db.Model):
     school = db.Column(db.String(100))
     gender = db.Column(db.String(10))
     bookings = db.relationship('Booking', backref='user', lazy=True)
+    reset_token = db.Column(db.String(100), unique=True)
+    reset_token_expiry = db.Column(db.DateTime)
 
 class Coupon(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -663,6 +682,7 @@ def signup():
                 username=username,
                 email=email,
                 password_hash=generate_password_hash(password),
+                registration_date=datetime.utcnow(),
                 # Add new fields
                 full_name=full_name,
                 birthdate=datetime.strptime(birthdate, '%Y-%m-%d').date(),
@@ -2419,6 +2439,118 @@ def kcc_cancel_membership():
     except Exception as e:
         db.session.rollback()
         return jsonify({'success': False, 'message': str(e)})
+
+@app.route('/change_password', methods=['GET', 'POST'])
+@login_required
+def change_password():
+    if request.method == 'POST':
+        current_password = request.form.get('current_password')
+        new_password = request.form.get('new_password')
+        confirm_password = request.form.get('confirm_password')
+        
+        user = User.query.get(session['user_id'])
+        
+        if not check_password_hash(user.password_hash, current_password):
+            flash('Current password is incorrect', 'error')
+            return redirect(url_for('change_password'))
+            
+        if new_password != confirm_password:
+            flash('New passwords do not match', 'error')
+            return redirect(url_for('change_password'))
+            
+        user.password_hash = generate_password_hash(new_password)
+        db.session.commit()
+        flash('Password updated successfully', 'success')
+        return redirect(url_for('index'))
+        
+    return render_template('change_password.html')
+
+@app.route('/forgot_password', methods=['GET', 'POST'])
+def forgot_password():
+    if request.method == 'POST':
+        email = request.form.get('email')
+        user = User.query.filter_by(email=email).first()
+        
+        if user:
+            try:
+                # Generate reset token
+                reset_token = token_urlsafe(32)
+                user.reset_token = reset_token
+                user.reset_token_expiry = datetime.utcnow() + timedelta(hours=24)
+                db.session.commit()
+                
+                # Create reset link
+                reset_link = url_for('reset_password', token=reset_token, _external=True)
+                
+                # Create email message
+                msg = Message(
+                    'Password Reset Request',
+                    recipients=[user.email]
+                )
+                
+                # Email content
+                msg.html = render_template(
+                    'email/reset_password.html',
+                    user=user,
+                    reset_link=reset_link
+                )
+                
+                # Send email
+                mail.send(msg)
+                
+                flash('Password reset instructions have been sent to your email', 'info')
+                return redirect(url_for('login'))
+                
+            except Exception as e:
+                print(f"Error sending email: {str(e)}")
+                db.session.rollback()
+                flash('An error occurred while sending the reset email. Please try again.', 'error')
+                return redirect(url_for('forgot_password'))
+                
+        flash('If an account exists with this email, you will receive reset instructions.', 'info')
+        return redirect(url_for('forgot_password'))
+        
+    return render_template('forgot_password.html')
+
+@app.route('/reset_password/<token>', methods=['GET', 'POST'])
+def reset_password(token):
+    user = User.query.filter_by(reset_token=token).first()
+    
+    if not user or not user.reset_token_expiry or user.reset_token_expiry < datetime.utcnow():
+        flash('Invalid or expired reset token. Please request a new password reset.', 'error')
+        return redirect(url_for('forgot_password'))
+        
+    if request.method == 'POST':
+        new_password = request.form.get('new_password')
+        confirm_password = request.form.get('confirm_password')
+        
+        if new_password != confirm_password:
+            flash('Passwords do not match', 'error')
+            return redirect(url_for('reset_password', token=token))
+            
+        user.password_hash = generate_password_hash(new_password)
+        user.reset_token = None
+        user.reset_token_expiry = None
+        db.session.commit()
+        
+        # Send confirmation email
+        try:
+            msg = Message(
+                'Password Reset Successful',
+                recipients=[user.email]
+            )
+            msg.html = render_template(
+                'email/reset_confirmation.html',
+                user=user
+            )
+            mail.send(msg)
+        except Exception as e:
+            print(f"Error sending confirmation email: {str(e)}")
+        
+        flash('Your password has been reset successfully. You can now login with your new password.', 'success')
+        return redirect(url_for('login'))
+        
+    return render_template('reset_password.html')
 
 if __name__ == '__main__':
     app.run(debug=True)
