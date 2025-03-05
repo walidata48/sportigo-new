@@ -1,0 +1,147 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>KCC Membership Management</h2>
+    
+    {% if booking.is_active %}
+        <div class="card mb-4">
+            <div class="card-body">
+                <h5 class="card-title">Current Membership</h5>
+                <p class="card-text">
+                    Package: {{ booking.package.package_name }}<br>
+                    Status: {{ booking.payment_status }}<br>
+                    Next Payment: {{ booking.next_payment_date.strftime('%d %B %Y') }}
+                </p>
+                
+                <!-- Pause Membership -->
+                <div class="mb-3">
+                    <h6>Pause Membership</h6>
+                    <form id="pauseForm" class="row g-3">
+                        <div class="col-auto">
+                            <input type="month" class="form-control" id="pauseMonth" name="pause_date" 
+                                   min="{{ today.strftime('%Y-%m') }}" required>
+                        </div>
+                        <div class="col-auto">
+                            <button type="submit" class="btn btn-warning">Pause for Selected Month</button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Cancel Membership -->
+                <div class="mt-4">
+                    <h6>Cancel Membership</h6>
+                    <button type="button" class="btn btn-danger" data-bs-toggle="modal" 
+                            data-bs-target="#cancelModal">
+                        Cancel Membership
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Upcoming Sessions -->
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">Upcoming Sessions</h5>
+                <div class="table-responsive">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Time</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for session in upcoming_sessions %}
+                            <tr>
+                                <td>{{ session.session_date.strftime('%d %B %Y') }}</td>
+                                <td>{{ session.start_time.strftime('%H:%M') }} - {{ session.end_time.strftime('%H:%M') }}</td>
+                                <td>{{ session.status }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Cancel Confirmation Modal -->
+        <div class="modal fade" id="cancelModal" tabindex="-1">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Confirm Cancellation</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p>Are you sure you want to cancel your KCC membership? This action cannot be undone.</p>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                        <button type="button" class="btn btn-danger" id="confirmCancel">Confirm Cancellation</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    {% else %}
+        <div class="alert alert-info">
+            You don't have an active KCC membership.
+        </div>
+    {% endif %}
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Pause Membership
+    const pauseForm = document.getElementById('pauseForm');
+    if (pauseForm) {
+        pauseForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            const pauseDate = document.getElementById('pauseMonth').value;
+            
+            fetch('/kcc/pause_membership', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: `booking_id={{ booking.id }}&pause_date=${pauseDate}`
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    location.reload();
+                } else {
+                    alert('Error: ' + data.message);
+                }
+            });
+        });
+    }
+
+    // Cancel Membership
+    const confirmCancelBtn = document.getElementById('confirmCancel');
+    if (confirmCancelBtn) {
+        confirmCancelBtn.addEventListener('click', function() {
+            fetch('/kcc/cancel_membership', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: `booking_id={{ booking.id }}`
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    location.reload();
+                } else {
+                    alert('Error: ' + data.message);
+                }
+            });
+        });
+    }
+});
+</script>
+{% endblock %} 

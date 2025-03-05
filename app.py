@@ -13,6 +13,7 @@ from uuid import uuid4
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 import atexit
+from sqlalchemy import extract
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://root:linkinpark1@localhost/sportigo_windows'
@@ -299,9 +300,29 @@ def utility_processor():
         ).order_by(ASABooking.booking_date.desc()).first()
         return current_booking
     
+    def get_current_bookings():
+        if 'user_id' not in session:
+            return None, None
+        
+        # Get the most recent active bookings for the current user
+        current_asa = ASABooking.query.filter_by(
+            user_id=session['user_id'],
+            is_active=True
+        ).order_by(ASABooking.booking_date.desc()).first()
+        
+        current_kcc = KCCBooking.query.filter_by(
+            user_id=session['user_id'],
+            is_active=True
+        ).order_by(KCCBooking.booking_date.desc()).first()
+        
+        return current_asa, current_kcc
+    
+    current_asa, current_kcc = get_current_bookings()
     return {
         'payment_notifications_count': get_payment_notifications_count(),
-        'current_booking': get_current_booking()
+        'current_booking': get_current_booking(),
+        'current_asa_booking': current_asa,
+        'current_kcc_booking': current_kcc
     }
 
 @app.route('/')
@@ -2317,6 +2338,87 @@ def cancel_membership():
     booking_id = request.form.get('booking_id')  # Already a string, no need to change
     booking = ASABooking.query.get_or_404(booking_id)
     # ... rest of the function ...
+
+@app.route('/kcc_membership_management/<string:booking_id>')
+@login_required
+def kcc_membership_management(booking_id):
+    booking = KCCBooking.query.get_or_404(booking_id)
+    
+    # Ensure user owns this booking
+    if booking.user_id != session['user_id']:
+        flash('Unauthorized access', 'error')
+        return redirect(url_for('index'))
+    
+    # Get upcoming sessions
+    today = datetime.now().date()
+    upcoming_sessions = KCCBookingSession.query.filter(
+        KCCBookingSession.booking_id == booking_id,
+        KCCBookingSession.session_date >= today
+    ).order_by(KCCBookingSession.session_date).all()
+    
+    return render_template(
+        'kcc/membership_management.html',
+        booking=booking,
+        upcoming_sessions=upcoming_sessions,
+        today=today
+    )
+
+@app.route('/kcc/pause_membership', methods=['POST'])
+@login_required
+def kcc_pause_membership():
+    booking_id = request.form.get('booking_id')
+    pause_date = datetime.strptime(request.form.get('pause_date'), '%Y-%m').date()
+    
+    booking = KCCBooking.query.get_or_404(booking_id)
+    
+    if booking.user_id != session['user_id']:
+        return jsonify({'success': False, 'message': 'Unauthorized'})
+    
+    try:
+        # Mark all sessions in the pause month as 'paused'
+        sessions = KCCBookingSession.query.filter(
+            KCCBookingSession.booking_id == booking_id,
+            extract('year', KCCBookingSession.session_date) == pause_date.year,
+            extract('month', KCCBookingSession.session_date) == pause_date.month
+        ).all()
+        
+        for session in sessions:
+            session.status = 'paused'
+        
+        db.session.commit()
+        return jsonify({'success': True})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)})
+
+@app.route('/kcc/cancel_membership', methods=['POST'])
+@login_required
+def kcc_cancel_membership():
+    booking_id = request.form.get('booking_id')
+    booking = KCCBooking.query.get_or_404(booking_id)
+    
+    if booking.user_id != session['user_id']:
+        return jsonify({'success': False, 'message': 'Unauthorized'})
+    
+    try:
+        # Mark booking as inactive
+        booking.is_active = False
+        
+        # Mark all future sessions as cancelled
+        today = datetime.now().date()
+        future_sessions = KCCBookingSession.query.filter(
+            KCCBookingSession.booking_id == booking_id,
+            KCCBookingSession.session_date > today
+        ).all()
+        
+        for session in future_sessions:
+            session.status = 'cancelled'
+        
+        db.session.commit()
+        return jsonify({'success': True})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)})
 
 if __name__ == '__main__':
     app.run(debug=True)

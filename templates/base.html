@@ -57,12 +57,29 @@
                         <li class="nav-item">
                             <a class="nav-link" href="{{ url_for('payment_history') }}">Payment History</a>
                         </li>
-                        {% if current_booking %}
-                            <li class="nav-item">
-                                <a class="nav-link" href="{{ url_for('membership_management', booking_id=current_booking.id) }}">
-                                    Manage Membership
-                                </a>
-                            </li>
+                        {% if current_asa_booking or current_kcc_booking %}
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle" href="#" id="membershipDropdown" role="button" 
+                               data-bs-toggle="dropdown" aria-expanded="false">
+                                Manage Memberships
+                            </a>
+                            <ul class="dropdown-menu" aria-labelledby="membershipDropdown">
+                                {% if current_asa_booking %}
+                                <li>
+                                    <a class="dropdown-item" href="{{ url_for('membership_management', booking_id=current_asa_booking.id) }}">
+                                        ASA Membership
+                                    </a>
+                                </li>
+                                {% endif %}
+                                {% if current_kcc_booking %}
+                                <li>
+                                    <a class="dropdown-item" href="{{ url_for('kcc_membership_management', booking_id=current_kcc_booking.id) }}">
+                                        KCC Membership
+                                    </a>
+                                </li>
+                                {% endif %}
+                            </ul>
+                        </li>
                         {% endif %}
                     {% else %}
                         <li class="nav-item">
