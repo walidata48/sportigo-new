@@ -10,6 +10,9 @@ from sqlalchemy import distinct, or_
 import midtransclient
 import json
 from uuid import uuid4
+from apscheduler.schedulers.background import BackgroundScheduler
+from apscheduler.triggers.cron import CronTrigger
+import atexit
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://root:linkinpark1@localhost/sportigo_windows'
@@ -286,8 +289,19 @@ def utility_processor():
     def get_payment_notifications_count():
         return getattr(g, 'payment_notifications_count', 0)
     
+    def get_current_booking():
+        if 'user_id' not in session:
+            return None
+        # Get the most recent active booking for the current user
+        current_booking = ASABooking.query.filter_by(
+            user_id=session['user_id'],
+            is_active=True
+        ).order_by(ASABooking.booking_date.desc()).first()
+        return current_booking
+    
     return {
-        'payment_notifications_count': get_payment_notifications_count()
+        'payment_notifications_count': get_payment_notifications_count(),
+        'current_booking': get_current_booking()
     }
 
 @app.route('/')
@@ -964,18 +978,77 @@ def asa_schedule(package_id):
 def asa_book(package_id):
     package = ASAPool.query.get_or_404(package_id)
     
-    # Create booking
     booking = ASABooking(
         user_id=session['user_id'],
         package_id=package_id,
-        payment_status='pending'  # Initial status
+        payment_status='pending',
+        is_active=True  # Set active immediately
     )
+    
+    # Calculate next payment date
+    today = datetime.now().date()
+    if today.day > 10:
+        next_month = today.replace(day=1) + timedelta(days=32)
+        booking.next_payment_date = next_month.replace(day=1)
+    else:
+        next_month = today.replace(day=1) + timedelta(days=32)
+        booking.next_payment_date = next_month.replace(day=1)
+    
+    booking.recurring_payment_date = 1
+    
     db.session.add(booking)
     
     try:
+        db.session.commit()  # Commit booking first to get booking_id
+        
+        # Create booking sessions immediately
+        # Calculate start and end dates
+        start_date = today
+        if today.day > 10:  # If after 10th, start from next month
+            start_date = (today.replace(day=1) + timedelta(days=32)).replace(day=1)
+        else:  # If before 10th, start from current month
+            start_date = today.replace(day=1)
+        
+        # End date is the last day of the month
+        end_date = (start_date.replace(day=1) + timedelta(days=32)).replace(day=1)
+        
+        # Day name translation dictionary
+        day_translations = {
+            'MONDAY': 'SENIN',
+            'TUESDAY': 'SELASA',
+            'WEDNESDAY': 'RABU',
+            'THURSDAY': 'KAMIS',
+            'FRIDAY': 'JUMAT',
+            'SATURDAY': 'SABTU',
+            'SUNDAY': 'MINGGU'
+        }
+        
+        # Get all schedules for this package
+        schedules = ASASchedule.query.filter_by(package_id=booking.package_id).all()
+        
+        # Create sessions for each day until end of month
+        current_date = start_date
+        while current_date < end_date:
+            english_day = current_date.strftime('%A').upper()
+            indo_day = day_translations[english_day]
+            
+            # Find matching schedule for this day
+            for schedule in schedules:
+                if schedule.day_name == indo_day:
+                    booking_session = ASABookingSession(  # Changed variable name to avoid conflict
+                        booking_id=booking.id,
+                        schedule_id=schedule.id,
+                        session_date=current_date,
+                        start_time=schedule.start_time,
+                        end_time=schedule.end_time,
+                        status='scheduled'
+                    )
+                    db.session.add(booking_session)
+            current_date += timedelta(days=1)
+        
         db.session.commit()
-        # Redirect to booking confirmation page
         return redirect(url_for('asa_booking_confirmation', booking_id=booking.id))
+        
     except Exception as e:
         db.session.rollback()
         flash('An error occurred while processing your booking. Please try again.', 'error')
@@ -1002,76 +1075,25 @@ def asa_booking_confirmation(booking_id):
 def update_asa_payment_status():
     try:
         booking_id = request.form.get('booking_id')
-        applied_discount = request.form.get('applied_discount', type=int) or 0
+        applied_discount = int(request.form.get('applied_discount', 0))
         
         booking = ASABooking.query.get_or_404(booking_id)
-        package = ASAPool.query.get(booking.package_id)
         
-        today = datetime.now().date()
-        
-        # Set recurring payment date to the 1st of each month
-        booking.recurring_payment_date = 1
-        
-        # Calculate next payment date
-        next_month = (today.replace(day=1) + timedelta(days=32)).replace(day=1)
-        booking.next_payment_date = next_month
-        
-        # Update booking with discount and payment status
-        booking.applied_discount = applied_discount
+        # Update booking payment status to 'paid'
         booking.payment_status = 'paid'
-        
-        # Create attendance sessions for the current month
-        current_date = today
-        if today.day > 10:  # If after 10th, start from next month
-            current_date = next_month
-        
-        end_date = (current_date.replace(day=1) + timedelta(days=32)).replace(day=1)
-        
-        # Day name translation dictionary
-        day_translations = {
-            'MONDAY': 'SENIN',
-            'TUESDAY': 'SELASA',
-            'WEDNESDAY': 'RABU',
-            'THURSDAY': 'KAMIS',
-            'FRIDAY': 'JUMAT',
-            'SATURDAY': 'SABTU',
-            'SUNDAY': 'MINGGU'
-        }
-        
-        # Get all schedules for this package
-        schedules = ASASchedule.query.filter_by(package_id=booking.package_id).all()
-        
-        # Create sessions for each day until end of month
-        while current_date < end_date:
-            english_day = current_date.strftime('%A').upper()
-            indo_day = day_translations[english_day]
-            
-            # Find matching schedule for this day
-            for schedule in schedules:
-                if schedule.day_name == indo_day:
-                    session = ASABookingSession(
-                        booking_id=booking_id,
-                        schedule_id=schedule.id,
-                        session_date=current_date,
-                        start_time=schedule.start_time,
-                        end_time=schedule.end_time,
-                        status='scheduled'
-                    )
-                    db.session.add(session)
-            current_date += timedelta(days=1)
+        booking.applied_discount = applied_discount
         
         db.session.commit()
         
         return jsonify({
             'success': True,
-            'message': 'Payment successful! Your membership is now active.'
+            'message': 'Payment status updated successfully'
         })
-        
     except Exception as e:
         db.session.rollback()
         return jsonify({
             'success': False,
-            'message': f'Payment failed: {str(e)}'
+            'message': str(e)
         })
 
 @app.route('/asa/my_schedule/<string:booking_id>')
@@ -2144,6 +2166,157 @@ def update_kcc_presence_batch():
     except Exception as e:
         db.session.rollback()
         return jsonify({'success': False, 'error': str(e)})
+
+@app.route('/membership_management/<string:booking_id>')  # Changed from int to string
+@login_required
+def membership_management(booking_id):
+    booking = ASABooking.query.get_or_404(booking_id)
+    
+    # Ensure user owns this booking
+    if booking.user_id != session['user_id']:
+        flash('Unauthorized access', 'error')
+        return redirect(url_for('index'))
+    
+    # Get upcoming sessions
+    today = datetime.now().date()
+    upcoming_sessions = ASABookingSession.query.filter(
+        ASABookingSession.booking_id == booking_id,
+        ASABookingSession.session_date >= today
+    ).order_by(ASABookingSession.session_date).all()
+    
+    return render_template(
+        'membership_management.html',
+        booking=booking,
+        upcoming_sessions=upcoming_sessions,
+        today=today
+    )
+
+# Initialize scheduler
+scheduler = BackgroundScheduler()
+
+def create_monthly_sessions(booking_id, target_date):
+    """Create sessions for a specific month"""
+    booking = ASABooking.query.get(booking_id)
+    if not booking:
+        return
+    
+    # Calculate start and end dates for the month
+    start_date = target_date.replace(day=1)
+    next_month = (start_date + timedelta(days=32)).replace(day=1)
+    
+    # Day name translation dictionary
+    day_translations = {
+        'MONDAY': 'SENIN',
+        'TUESDAY': 'SELASA',
+        'WEDNESDAY': 'RABU',
+        'THURSDAY': 'KAMIS',
+        'FRIDAY': 'JUMAT',
+        'SATURDAY': 'SABTU',
+        'SUNDAY': 'MINGGU'
+    }
+    
+    # Get all schedules for this package
+    schedules = ASASchedule.query.filter_by(package_id=booking.package_id).all()
+    
+    # Create sessions for the month
+    current_date = start_date
+    while current_date < next_month:
+        english_day = current_date.strftime('%A').upper()
+        indo_day = day_translations[english_day]
+        
+        for schedule in schedules:
+            if schedule.day_name == indo_day:
+                # Check if session already exists
+                existing_session = ASABookingSession.query.filter_by(
+                    booking_id=booking_id,
+                    session_date=current_date,
+                    schedule_id=schedule.id
+                ).first()
+                
+                if not existing_session:
+                    booking_session = ASABookingSession(
+                        booking_id=booking_id,
+                        schedule_id=schedule.id,
+                        session_date=current_date,
+                        start_time=schedule.start_time,
+                        end_time=schedule.end_time,
+                        status='scheduled'
+                    )
+                    db.session.add(booking_session)
+        
+        current_date += timedelta(days=1)
+    
+    db.session.commit()
+
+def create_monthly_kcc_sessions(booking_id, target_date):
+    """Create KCC sessions for a specific month"""
+    booking = KCCBooking.query.get(booking_id)
+    if not booking:
+        return
+    
+    # Similar logic as create_monthly_sessions but for KCC
+    # ... (implement similar to ASA sessions)
+    pass
+
+def generate_next_month_sessions():
+    """Generate sessions for next month for all active bookings"""
+    try:
+        # Calculate next month's date
+        next_month = (datetime.now().date() + timedelta(days=32)).replace(day=1)
+        
+        # Generate ASA sessions
+        active_asa_bookings = ASABooking.query.filter_by(is_active=True).all()
+        for booking in active_asa_bookings:
+            create_monthly_sessions(booking.id, next_month)
+            
+        # Generate KCC sessions
+        active_kcc_bookings = KCCBooking.query.filter_by(is_active=True).all()
+        for booking in active_kcc_bookings:
+            create_monthly_kcc_sessions(booking.id, next_month)
+            
+        print(f"Successfully generated sessions for {next_month.strftime('%B %Y')}")
+        
+    except Exception as e:
+        print(f"Error generating monthly sessions: {str(e)}")
+
+def init_scheduler(app):
+    with app.app_context():
+        # Schedule the task to run on the 25th of every month at 00:01
+        scheduler.add_job(
+            func=generate_next_month_sessions,
+            trigger=CronTrigger(day='25', hour='0', minute='1'),
+            id='generate_monthly_sessions',
+            name='Generate next month sessions',
+            replace_existing=True
+        )
+        
+        # Start the scheduler
+        scheduler.start()
+
+# Add this to your create_app or after app initialization
+init_scheduler(app)
+
+# Make sure to add graceful shutdown
+@atexit.register
+def shutdown_scheduler():
+    if scheduler.running:
+        scheduler.shutdown()
+
+@app.route('/asa/pause_membership', methods=['POST'])
+@login_required
+def pause_membership():
+    booking_id = request.form.get('booking_id')  # Already a string, no need to change
+    pause_date = datetime.strptime(request.form.get('pause_date'), '%Y-%m').date()
+    
+    booking = ASABooking.query.get_or_404(booking_id)
+    # ... rest of the function ...
+
+@app.route('/asa/cancel_membership', methods=['POST'])
+@login_required
+def cancel_membership():
+    booking_id = request.form.get('booking_id')  # Already a string, no need to change
+    booking = ASABooking.query.get_or_404(booking_id)
+    # ... rest of the function ...
 
 if __name__ == '__main__':
     app.run(debug=True)

@@ -57,6 +57,13 @@
                         <li class="nav-item">
                             <a class="nav-link" href="{{ url_for('payment_history') }}">Payment History</a>
                         </li>
+                        {% if current_booking %}
+                            <li class="nav-item">
+                                <a class="nav-link" href="{{ url_for('membership_management', booking_id=current_booking.id) }}">
+                                    Manage Membership
+                                </a>
+                            </li>
+                        {% endif %}
                     {% else %}
                         <li class="nav-item">
                             <a class="nav-link" href="{{ url_for('login') }}">Login</a>
