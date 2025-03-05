@@ -112,7 +112,13 @@
                             <hr>
                             
                             <div class="mt-3">
-                                <p>Forgot your password? <a href="{{ url_for('forgot_password') }}">Reset it here</a></p>
+                                <p>Forgot your password?</p>
+                                <form id="forgotPasswordForm" class="mt-2">
+                                    <div class="mb-3">
+                                        <input type="email" class="form-control" id="resetEmail" name="email" placeholder="Enter your email" required>
+                                    </div>
+                                    <button type="submit" class="btn btn-link px-0">Send Reset Instructions</button>
+                                </form>
                             </div>
                         </div>
                     </div>
@@ -121,4 +127,71 @@
         </div>
     </div>
 </div>
+
+<!-- Add this modal at the bottom of your profile.html, before the closing body tag -->
+<div class="modal fade" id="emailSentModal" tabindex="-1" aria-labelledby="emailSentModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="emailSentModalLabel">Check Your Email</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p id="modalMessage"></p>
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle"></i> Please check your email inbox and spam folder for the reset instructions.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add this JavaScript at the bottom of your profile.html -->
+{% block scripts %}
+<script>
+document.getElementById('forgotPasswordForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const email = document.getElementById('resetEmail').value;
+    const form = this;
+    
+    // Show loading state
+    form.querySelector('button').disabled = true;
+    form.querySelector('button').innerHTML = 'Sending...';
+    
+    fetch('{{ url_for("forgot_password") }}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: `email=${encodeURIComponent(email)}`
+    })
+    .then(response => response.json())
+    .then(data => {
+        // Reset form
+        form.reset();
+        form.querySelector('button').disabled = false;
+        form.querySelector('button').innerHTML = 'Send Reset Instructions';
+        
+        // Show modal with message
+        document.getElementById('modalMessage').textContent = data.message;
+        var modal = new bootstrap.Modal(document.getElementById('emailSentModal'));
+        modal.show();
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        form.querySelector('button').disabled = false;
+        form.querySelector('button').innerHTML = 'Send Reset Instructions';
+        
+        // Show error in modal
+        document.getElementById('modalMessage').textContent = 'An error occurred. Please try again.';
+        var modal = new bootstrap.Modal(document.getElementById('emailSentModal'));
+        modal.show();
+    });
+});
+</script>
+{% endblock %}
 {% endblock %} 

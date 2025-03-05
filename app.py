@@ -2498,17 +2498,24 @@ def forgot_password():
                 # Send email
                 mail.send(msg)
                 
-                flash('Password reset instructions have been sent to your email', 'info')
-                return redirect(url_for('login'))
+                return jsonify({
+                    'success': True,
+                    'message': 'Password reset instructions have been sent to your email'
+                })
                 
             except Exception as e:
                 print(f"Error sending email: {str(e)}")
                 db.session.rollback()
-                flash('An error occurred while sending the reset email. Please try again.', 'error')
-                return redirect(url_for('forgot_password'))
+                return jsonify({
+                    'success': False,
+                    'message': 'An error occurred while sending the reset email. Please try again.'
+                })
                 
-        flash('If an account exists with this email, you will receive reset instructions.', 'info')
-        return redirect(url_for('forgot_password'))
+        # For security, don't reveal if email exists or not
+        return jsonify({
+            'success': True,
+            'message': 'If an account exists with this email, you will receive reset instructions.'
+        })
         
     return render_template('forgot_password.html')
 
@@ -2580,4 +2587,4 @@ def profile():
     return render_template('profile.html', user=user)
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(host='0.0.0.0', port=5000, debug=True)
